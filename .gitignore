@@ -1,0 +1,13 @@
+*.o
+*.log
+*.pyc
+*.pyo
+*.tmp
+*.so
+*.pyd
+*.~
+/src_windows32bit
+/test
+log.*
+.dropbox
+
