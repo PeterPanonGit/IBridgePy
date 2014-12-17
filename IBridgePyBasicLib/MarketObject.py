@@ -8,7 +8,7 @@ Created on Sun Jul 06 12:47:40 2014
 import datetime
 import pytz
 import time
-from basic.Enum import EnumClass
+from BasicPyLib.FiniteState import FiniteStateClass
 
 class __USEasternMarketObject__(object):
     """
@@ -27,7 +27,7 @@ class __USEasternMarketObject__(object):
         else:
             self.USeasternTimeZone = None
             
-        self.marketState = EnumClass(stateList = ['sleep', 'run'])
+        self.marketState = FiniteStateClass(stateList = ['sleep', 'run'])
         
     def init_obj(self):
         pass
@@ -45,7 +45,7 @@ class __USEasternMarketObject__(object):
         if market opens, it will first initialize the object and then run the object
         if market closes, it will turn the marketState back to "sleep"
         """
-        while (self.marketState.sleep):
+        while (self.marketState.is_state(self.marketState.states.sleep)):
             time.sleep(1)
             currentTime = datetime.datetime.now(self.USeasternTimeZone)
             dataDate = str(currentTime).split(' ')[0]
@@ -54,15 +54,17 @@ class __USEasternMarketObject__(object):
             endTime = datetime.datetime.strptime(dataDate + ' ' + market_close_time, '%Y-%m-%d %H:%M:%S')
             endTime = endTime.replace(tzinfo = self.USeasternTimeZone)           
     #        print currentTime.hour, currentTime.minute, currentTime.second
-            if (self.marketState.sleep) and (currentTime > startTime) and (currentTime < endTime) and currentTime.isoweekday() in range(1, 6):
-                self.marketState.set_state('run')
+            if (self.marketState.is_state(self.marketState.states.sleep) \
+            and (currentTime > startTime) and (currentTime < endTime) \
+            and currentTime.isoweekday() in range(1, 6)):
+                self.marketState.set_state(self.marketState.states.run)
                 print 'start to run at: ', currentTime
                 self.init_obj()
-            while (self.marketState.run):
+            while (self.marketState.is_state(self.marketState.states.run)):
                 self.run_algorithm()
                 currentTime = datetime.datetime.now(self.USeasternTimeZone)
                 if (currentTime >= endTime):
                     print "Market is closed at: ", currentTime
                     self.destroy_obj()
-                    self.marketState.set_state('sleep')     
+                    self.marketState.set_state(self.marketState.states.sleep)     
                     

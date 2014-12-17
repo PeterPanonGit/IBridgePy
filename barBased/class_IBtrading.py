@@ -388,15 +388,13 @@ class IBtrading(IBridgePy.IBClient) :  #  define a new client class. All client 
         if sid==None:
             result={}
             for ct in self.context.portfolio.openOrderBook:
-                result[self.context.portfolio.openOrderBook[ct].sid] = \
-                self.context.portfolio.openOrderBook[ct]
+                result[self.context.portfolio.openOrderBook[ct].sid]=self.context.portfolio.openOrderBook[ct]
             return result
         else:
             result={}            
             for ct in self.context.portfolio.openOrderBook:
                 if same_security(self.context.portfolio.openOrderBook[ct].sid,sid):
-                    result[self.context.portfolio.openOrderBook[ct].sid] = \
-                    self.context.portfolio.openOrderBook[ct]
+                    result[self.context.portfolio.openOrderBook[ct].sid]=self.context.portfolio.openOrderBook[ct]
             return result
 
     def get_datetime_quantopian(self, timezone=None):
@@ -428,14 +426,14 @@ class IBtrading(IBridgePy.IBClient) :  #  define a new client class. All client 
             if i==0:
                 if frequency=='1d':
                     #print self.data[security].hist_daily[inpt][-bar_count:]
-                    result=pd.DataFrame({security.symbol+'.'+security.currency+'.'+security.secType:self.data[security].hist_daily[inpt][-bar_count:]},index=self.data[security].hist_daily.index[-bar_count:])
+                    result=pd.DataFrame({security:self.data[security].hist_daily[inpt][-bar_count:]},index=self.data[security].hist_daily.index[-bar_count:])
                 if frequency=='1m':
-                    result=pd.DataFrame({security.symbol+'.'+security.currency+'.'+security.secType:self.data[security].hist_minute[inpt][-bar_count:]},index=self.data[security].hist_minute.index[-bar_count:])
+                    result=pd.DataFrame({security:self.data[security].hist_minute[inpt][-bar_count:]},index=self.data[security].hist_minute.index[-bar_count:])
             else:
                 if frequency=='1d':
-                    newColumn=pd.DataFrame({security.symbol+'.'+security.currency+'.'+security.secType:self.data[security].hist_daily[inpt][-bar_count:]},index=self.data[security].hist_daily.index[-bar_count:])
+                    newColumn=pd.DataFrame({security:self.data[security].hist_daily[inpt][-bar_count:]},index=self.data[security].hist_daily.index[-bar_count:])
                 if frequency=='1m':
-                    newColumn=pd.DataFrame({security.symbol+'.'+security.currency+'.'+security.secType:self.data[security].hist_minute[inpt][-bar_count:]},index=self.data[security].hist_minute.index[-bar_count:])
+                    newColumn=pd.DataFrame({security:self.data[security].hist_minute[inpt][-bar_count:]},index=self.data[security].hist_minute.index[-bar_count:])
                 result=result.join(newColumn,how='outer')
         if ffill==True:
             result=result.fillna(method='ffill')
