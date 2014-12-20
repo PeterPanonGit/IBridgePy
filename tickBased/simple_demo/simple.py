@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import IBpy  # You need to link/copy IBpy.so to the same directory 
+import IBCpp  # You need to link/copy IBCpp.so to the same directory 
 import sys
 
 
-class MyClient(IBpy.IBClient) :  #  define a new client class. All client classes are recommended to derive from IBClient unless you have special need.  
+class MyClient(IBCpp.IBClient) :  #  define a new client class. All client classes are recommended to derive from IBClient unless you have special need.  
     def setup(self):
         self.state = "initial"
         
@@ -22,7 +22,7 @@ class MyClient(IBpy.IBClient) :  #  define a new client class. All client classe
         This should be your trading strategy's main entry. It will be called at the beginning of processMessages()
         '''
         if self.state == "initial":
-            contract = IBpy.Contract()
+            contract = IBCpp.Contract()
             contract.symbol = "TSLA"
             contract.secType = "STK"
             contract.exchange = "SMART"
@@ -33,12 +33,12 @@ class MyClient(IBpy.IBClient) :  #  define a new client class. All client classe
 
         
 if __name__ == '__main__' :
-    port = int(sys.argv[1])
-    if len(sys.argv[1:]) > 1 :
-        clientID = int(sys.argv[2])
-    else :
-        clientID = 0
-
+#    port = int(sys.argv[1])
+#    if len(sys.argv[1:]) > 1 :
+#        clientID = int(sys.argv[2])
+#    else :
+#        clientID = 0
+    port = 7496; clientID = 1
     c = MyClient()  # create a client object
     c.setup();      # additional setup. It's optional.
     c.connect("", port, clientID) # you need to connect to the server before you do anything. 

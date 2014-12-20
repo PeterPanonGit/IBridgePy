@@ -1,6 +1,8 @@
 
 import datetime
 import pandas as pd
+import os
+from BasicPyLib.Printable import PrintableClass
 
 def symbol(s1):
     return Security(s1)
@@ -12,8 +14,8 @@ def symbols(*args):
     return ls       
 
 def create_contract(security):
-    import IBridgePy
-    contract = IBridgePy.Contract()
+    import IBCpp
+    contract = IBCpp.Contract()
     contract.symbol = security.symbol
     contract.secType = security.secType
     contract.exchange = security.exchange
@@ -22,9 +24,9 @@ def create_contract(security):
     return contract 
 
 def create_order(action,amount,style): 
-    import IBridgePy
+    import IBCpp
     orderType,stop_price,limit_price,exchange=style
-    order = IBridgePy.Order()
+    order = IBCpp.Order()
     order.action = action      # BUY, SELL
     order.totalQuantity = amount
     order.orderType =  orderType  #LMT, MKT, STP
@@ -70,15 +72,17 @@ def StopLimitOrder(limit_price, stop_price, exchange='SMART'):
 
 
 ############## Quantopian compatible data structures
+stockList = pd.read_csv(os.path.join(os.path.dirname(os.path.dirname(__file__)),
+'all_US_Stocks.csv'))
 
-class Security(object):
+class Security(PrintableClass):
     def __init__(self, symbol, sid=0, security_name=None, security_start_date=None,security_end_date=None):
 
         self.sid=sid
         self.security_name=security_name
-        self.security_start_date=datetime.datetime(2000,1,1)            
+        self.security_start_date = None
         self.security_end_date=datetime.datetime.now()
-        self.req_real_time_price_id=0
+        self.nextReqMktDataId = 0
 
         if symbol.split('.')[0] in ['EUR','GBP','USD','JPY','AUD','CAD','CHF'] and symbol.split('.')[-1] in ['EUR','GBP','USD','JPY','AUD','CAD','CHF']:
             self.symbol=symbol[0:3]            
@@ -87,30 +91,26 @@ class Security(object):
             self.primaryExchange = 'IDEALPRO'
             self.currency = symbol.split('.')[-1]  
         else:
-            stockList = []
-            try:
-                stockList = pd.read_csv('all_US_Stocks.csv')
-            except:
-                print 'Warning: "all_US_Stocks.csv" does not exist'
             self.symbol=symbol
             self.secType='STK'
             self.exchange = 'SMART'
-            if (symbol in stockList['Symbol']):
-                self.primaryExchange = stockList[stockList['Symbol'] == \
-                symbol]['primaryExchange'].values[0]
-                self.currency = stockList[stockList['Symbol'] == \
-                symbol]['Currency'].values[0]
+            tmp_df = stockList[stockList['Symbol'] == symbol]
+            if (tmp_df.shape[0] > 0):
+                self.primaryExchange = tmp_df['primaryExchange'].values[0]
+                self.currency = tmp_df['Currency'].values[0]
+                self.security_name = tmp_df['Name'].values[0]
+                self.security_start_date = tmp_df['IPOyear'].values[0]
             else:
                 self.primaryExchange = 'NYSE'
                 self.currency = 'USD' 
 
         
-class ContextClass(object):
+class ContextClass(PrintableClass):
     def __init__(self):
         self.portfolio = PortofolioClass()
         
 
-class PortofolioClass(object):
+class PortofolioClass(PrintableClass):
     def __init__(self, capital_used = 0.0, cash = 0.0, pnl = 0.0, positions = {}, openOrderBook={}, 
                  portfolio_value = 0.0, positions_value = 0.0, returns = 0.0, 
                  starting_cash = 0.0, start_date = datetime.datetime.now()):
@@ -125,7 +125,7 @@ class PortofolioClass(object):
         self.starting_cash = starting_cash
         self.start_date = start_date
         
-class PositionClass(object):
+class PositionClass(PrintableClass):
     def __init__(self, amount=0, cost_basis=None, last_sale_price=None, sid=None):
         self.amount = amount
         self.cost_basis=cost_basis
@@ -134,7 +134,7 @@ class PositionClass(object):
 
         
       
-class DataClass(object):
+class DataClass(PrintableClass):
     def __init__(self,
                  datetime=datetime.datetime(2000,01,01,00,00),
                  price = None,
@@ -149,22 +149,22 @@ class DataClass(object):
         self.close_price=close_price # Quatopian
         self.high = high # Quatopian
         self.low = low # Quatopian
-        self.volume= volume # Quatopian
-        self.daily_high_price=None
-        self.daily_low_price=None
-        self.bid_price=None
-        self.ask_price=None
-        self.hist_daily=pd.DataFrame()
-        self.hist_minute=pd.DataFrame()
+        self.volume = volume # Quatopian
+        self.daily_high_price = None
+        self.daily_low_price = None
+        self.bid_price = None
+        self.ask_price = None
+        self.hist_daily = pd.DataFrame()
+        self.hist_bar = pd.DataFrame()
         
     def update(self,time_input):
         self.datetime=time_input
-        self.price=self.hist_minute['close'][-1]
-        self.close_price=self.hist_minute['close'][-1]
-        self.high=self.hist_minute['high'][-1]
-        self.low=self.hist_minute['low'][-1]
-        self.volume=self.hist_minute['volume'][-1]
-        self.open_price=self.hist_minute['open'][-1]
+        self.price=self.hist_bar['close'][-1]
+        self.close_price=self.hist_bar['close'][-1]
+        self.high=self.hist_bar['high'][-1]
+        self.low=self.hist_bar['low'][-1]
+        self.volume=self.hist_bar['volume'][-1]
+        self.open_price=self.hist_bar['open'][-1]
         self.hist_daily['high'][-1]=self.daily_high_price
         self.hist_daily['low'][-1]=self.daily_low_price
         self.hist_daily['close'][-1]=self.price
@@ -207,4 +207,6 @@ class OrderClass(object):
         self.order=order
         self.orderstate=orderstate
 
-        
+if __name__ == '__main__':
+    stockList = pd.read_csv('all_US_Stocks.csv')
+    print stockList.shape

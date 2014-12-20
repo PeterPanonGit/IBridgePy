@@ -1,0 +1,4 @@
+barBased:
+* find list of securities automatically
+* flexible amount of historical data
+* run on time grid 

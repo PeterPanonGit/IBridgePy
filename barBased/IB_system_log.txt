@@ -1,0 +1,4 @@
+[Fri Dec 19 23:07:58 2014] IBINFO: Connecting to 127.0.0.1:7496with client ID 1
+
+[Fri Dec 19 23:07:58 2014] IBINFO: Connected to 127.0.0.1:7496 with client ID 1
+
