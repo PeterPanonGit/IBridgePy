@@ -27,9 +27,9 @@ class __USEasternMarketObject__(object):
         # state of market
         class USEasternMarketStateClass(FiniteStateClass):
             def __init__(self):
-                self.sleep = 'sleep'; self.run = 'run'
+                self.SLEEP = 'SLEEP'; self.RUN = 'RUN'
         self.marketState = USEasternMarketStateClass()
-        self.marketState.set_state(self.marketState.sleep)
+        self.marketState.set_state(self.marketState.SLEEP)
         
         # DEBUG levels
         self.PROGRAM_DEBUG = PROGRAM_DEBUG
@@ -51,7 +51,7 @@ class __USEasternMarketObject__(object):
         if market opens, it will first initialize the object and then run the object
         if market closes, it will turn the marketState back to "sleep"
         """
-        while (self.marketState.is_state(self.marketState.sleep)):
+        while (self.marketState.is_state(self.marketState.SLEEP)):
             time.sleep(1)
             currentTime = datetime.datetime.now(self.USeasternTimeZone)
             dataDate = str(currentTime).split(' ')[0]
@@ -60,19 +60,19 @@ class __USEasternMarketObject__(object):
             endTime = datetime.datetime.strptime(dataDate + ' ' + market_close_time, '%Y-%m-%d %H:%M:%S')
             endTime = endTime.replace(tzinfo = self.USeasternTimeZone)           
     #        print currentTime.hour, currentTime.minute, currentTime.second
-            if (self.marketState.is_state(self.marketState.sleep) \
+            if (self.marketState.is_state(self.marketState.SLEEP) \
             and (currentTime > startTime) and (currentTime < endTime) \
             and currentTime.isoweekday() in range(1, 6)):
-                self.marketState.set_state(self.marketState.run)
+                self.marketState.set_state(self.marketState.RUN)
                 print 'start to run at: ', currentTime
                 self.init_obj()
-            while (self.marketState.is_state(self.marketState.run)):
+            while (self.marketState.is_state(self.marketState.RUN)):
                 self.run_client_algorithm()
                 currentTime = datetime.datetime.now(self.USeasternTimeZone)
                 if (currentTime >= endTime):
                     print "Market is closed at: ", currentTime
                     self.destroy_obj()
-                    self.marketState.set_state(self.marketState.sleep) 
+                    self.marketState.set_state(self.marketState.SLEEP) 
                     
 class MarketManager(__USEasternMarketObject__):
     """ 

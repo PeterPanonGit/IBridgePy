@@ -6,6 +6,7 @@ import pandas as pd
 from IBridgePy.IBridgePyBasicLib.quantopian import Security, ContextClass, PositionClass, \
 HistClass, create_contract, MarketOrder, create_order, OrderClass, same_security
 import IBCpp
+from BasicPyLib.FiniteState import FiniteStateClass
 
 class IBAccountManager(IBCpp.IBClient):
     """
@@ -23,7 +24,23 @@ class IBAccountManager(IBCpp.IBClient):
         # timezone info passed from MarketManager
         self.USeasternTimeZone = USeasternTimeZone
         
-        self.accountManagerState='init'
+        # traderState
+        class AccountManagerStateClass(FiniteStateClass):
+            """ define possible states of traderState """
+            def __init__(self):
+                self.INIT = 'INIT'
+                self.WAIT_FOR_INIT_CALLBACK = 'WAIT_FOR_INIT_CALLBACK'
+                self.REQ_BAR_PRICE = 'REQ_BAR_PRICE'
+                self.REQ_DAILY_PRICE = 'REQ_DAILY_PRICE'
+                self.WAIT_FOR_DAILY_PRICE_CALLBACK = 'WAIT_FOR_DAILY_PRICE_CALLBACK'
+                self.WAIT_FOR_BAR_PRICE_CALLBACK = 'WAIT_FOR_BAR_PRICE_CALLBACK'
+                self.UPDATE_PORTFOLIO = 'UPDATE_PORTFOLIO'
+                self.WAIT_FOR_UPDATE_PORTFOLIO_CALLBACK = 'WAIT_FOR_UPDATE_PORTFOLIO_CALLBACK'
+                self.EVERY_BAR_RUN = 'EVERY_BAR_RUN'
+                self.SLEEP = 'SLEEP'
+        self.accountManagerState = AccountManagerStateClass()
+        self.accountManagerState.set_state(self.accountManagerState.INIT)
+        
         self.returned_hist= {}
         self.accountDownloadEndstatus='na'
         self.stime_previous = None

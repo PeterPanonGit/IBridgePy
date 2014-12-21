@@ -46,9 +46,9 @@ class BarTrader(IBAccountManager) :  #  define a new client class. All client cl
         class TraderStateClass(FiniteStateClass):
             """ define possible states of traderState """
             def __init__(self):
-                self.init = 'init'; self.main = 'main'
+                self.INIT = 'INIT'; self.TRADE = 'TRADE'
         self.traderState = TraderStateClass()
-        self.traderState.set_state(self.traderState.init)
+        self.traderState.set_state(self.traderState.INIT)
         
         self.reqCurrentTime() # update stime
         self.reqPositions()
@@ -109,14 +109,14 @@ class BarTrader(IBAccountManager) :  #  define a new client class. All client cl
         timer_now = datetime.datetime.now(tz = self.USeasternTimeZone)
         change = (timer_now-self.timer_start).total_seconds()
         if change > limit: # if time limit exceeded
-            if step=='wait_for_init_callback':
+            if step == self.accountManagerState.WAIT_FOR_INIT_CALLBACK:
                 if self.nextOrderId_Status !='Done':
                     print 'Time Limit Exceeded when requesting nextValidId', \
                     step,datetime.datetime.now()
                     print 'self.nextValidId_status=', self.nextValidId_status
                     self.set_timer()
-            elif step == 'wait_for_daily_price_callback':
-                print 'Time Limit Exceeded when requesting historical data', \
+            elif step == self.accountManagerState.WAIT_FOR_DAILY_PRICE_CALLBACK:
+                print 'Time Limit Exceeded when requesting historical daily data', \
                 step, datetime.datetime.now()
                 print 'The content of self.hist_daily'
                 for security in self.data:
@@ -129,20 +129,21 @@ class BarTrader(IBAccountManager) :  #  define a new client class. All client cl
                 else:
                     print 'Re-send request three times, EXIT'
                     exit()
-            elif step == 'wait_for_bar_price_callback':
+            elif step == self.accountManagerState.WAIT_FOR_BAR_PRICE_CALLBACK:
                 print 'Time Limit Exceeded when requesting historical bar data', \
                 step,datetime.datetime.now()
                 for security in self.data:
                     print self.data[security].hist_bar.head()
                 if self.re_send < 3:    
-                    self.accountManagerState = 'req_bar_price'
+                    self.accountManagerState.set_state(
+                    self.accountManagerState.REQ_BAR_PRICE)
                     print 'Re-send req_bar_price_first''trade_return'
                     self.re_send += 1
                     self.set_timer()
                 else:
                     print 'Re send request three times, EXIT'
                     exit()
-            elif step == 'wait_for_update_portfolio_callback':
+            elif step == self.accountManagerState.WAIT_FOR_UPDATE_PORTFOLIO_CALLBACK:
                 self.display('update account failed')
                 
     ############# trader specific order functions ###################
@@ -225,80 +226,95 @@ class BarTrader(IBAccountManager) :  #  define a new client class. All client cl
         time.sleep(0.1) # sleep for sometime to avoid sending messages too fast
         self.reqCurrentTime()
         # initialize
-        if self.traderState.is_state(self.traderState.init):
-            if self.accountManagerState == 'init':
+        if self.traderState.is_state(self.traderState.INIT):
+            if self.accountManagerState.is_state(self.accountManagerState.INIT):
                 self.req_hist_price(endtime=datetime.datetime.now())
                 self.re_send = 0
                 self.req_real_time_price() # request market data
                 self.set_timer()
-                self.accountManagerState = 'wait_for_init_callback'
-            if self.accountManagerState == 'wait_for_init_callback': 
-                self.check_timer('wait_for_init_callback')
+                self.accountManagerState.set_state(
+                    self.accountManagerState.WAIT_FOR_INIT_CALLBACK)
+            if self.accountManagerState.is_state(
+                    self.accountManagerState.WAIT_FOR_INIT_CALLBACK): 
+                self.check_timer(self.accountManagerState.WAIT_FOR_INIT_CALLBACK)
                 if self.req_hist_price_check_end(): 
                     # update historical data for each security
                     for security in self.returned_hist:
                         self.data[security].hist_daily = \
                             self.returned_hist[security].hist
-                    self.traderState.set_state(self.traderState.main)
+                    self.traderState.set_state(self.traderState.TRADE)
                     
         # main: every bar
-        if self.traderState.is_state(self.traderState.main):
+        if self.traderState.is_state(self.traderState.TRADE):
             # At the beginning of every bar, request hist_bar_price
             # Every day, at 14:15 EST, request hist_daily_price
             # this is run regardless of accountManagerState
             if ((self.stime_previous is None and 
-            self.accountManagerState == 'wait_for_init_callback') or 
-            (self.stime_previous is not None and 
+            self.accountManagerState.is_state(self.accountManagerState.WAIT_FOR_INIT_CALLBACK))
+            or (self.stime_previous is not None and 
             self.stime - self.stime_previous > self.barSize)):
                 self.stime_previous = self.stime
                 if self.stime.hour == 14 and self.stime.minute == 15 and \
                 self.state.second == 0 :
-                    self.accountManagerState = 'req_daily_price'
+                    self.accountManagerState.set_state(
+                    self.accountManagerState.REQ_DAILY_PRICE)
                 else:
-                    self.accountManagerState = 'req_bar_price'
+                    self.accountManagerState.set_state(
+                    self.accountManagerState.REQ_BAR_PRICE)
                 
             # Request hist_daily    
-            if self.accountManagerState=='req_daily_price':
+            if self.accountManagerState.is_state(self.accountManagerState.REQ_DAILY_PRICE):
 #                print "request daily data"
                 self.req_hist_price(endtime=datetime.datetime.now())
-                self.accountManagerState='wait_for_daily_price_callback' 
+                self.accountManagerState.set_state(
+                    self.accountManagerState.WAIT_FOR_DAILY_PRICE_CALLBACK)
                 self.set_timer()
-            if self.accountManagerState=='wait_for_daily_price_callback':
-                self.check_timer('wait_for_daily_price_callback', 2)
+            if self.accountManagerState.is_state(
+            self.accountManagerState.WAIT_FOR_DAILY_PRICE_CALLBACK):
+                self.check_timer(self.accountManagerState.WAIT_FOR_DAILY_PRICE_CALLBACK, 2)
                 if self.req_hist_price_check_end():
                     for security in self.returned_hist:
                         self.data[security].hist_daily = self.returned_hist[security].hist                      
-                    self.accountManagerState = 'req_bar_price'
+                    self.accountManagerState.set_state(
+                    self.accountManagerState.REQ_BAR_PRICE)
                     
             # Request hist_bar    
 #            if (self.PROGRAM_DEBUG):
 #                print self.accountManagerState
-            if self.accountManagerState == 'req_bar_price':
+            if self.accountManagerState.is_state(
+            self.accountManagerState.REQ_BAR_PRICE):
                 self.req_hist_price(endtime=datetime.datetime.now(), 
                                     goback='6000', barSize='1 min')
-                self.accountManagerState = 'wait_for_bar_price_callback' 
+                self.accountManagerState.set_state(
+                self.accountManagerState.WAIT_FOR_BAR_PRICE_CALLBACK) 
                 self.set_timer()
-            if self.accountManagerState == 'wait_for_bar_price_callback':
-                self.check_timer('wait_for_bar_price_callback', 10)
+            if self.accountManagerState.is_state(
+            self.accountManagerState.WAIT_FOR_BAR_PRICE_CALLBACK):
+                self.check_timer(self.accountManagerState.WAIT_FOR_BAR_PRICE_CALLBACK, 10)
                 if self.req_hist_price_check_end():
                     # save historical data to self.data
                     for security in self.returned_hist:
                         self.data[security].hist_bar = self.returned_hist[security].hist
-                    self.accountManagerState='update_portfolio'
+                    self.accountManagerState.set_state(
+                    self.accountManagerState.UPDATE_PORTFOLIO)
 
             # Update portfolio        
-            if self.accountManagerState == 'update_portfolio':
+            if self.accountManagerState.is_state(
+            self.accountManagerState.UPDATE_PORTFOLIO):
                 self.reqAccountUpdates(True, self.accountCode) 
                 self.accountDownloadEndstatus='Submitted'
-                self.accountManagerState = 'wait_for_update_portfolio_callback'
+                self.accountManagerState.set_state(
+                self.accountManagerState.WAIT_FOR_UPDATE_PORTFOLIO_CALLBACK)
                 self.set_timer()
-            if self.accountManagerState=='wait_for_update_portfolio_callback':
-                self.check_timer('wait_for_update_portfolio_callback', 2)
+            if self.accountManagerState.is_state(
+            self.accountManagerState.WAIT_FOR_UPDATE_PORTFOLIO_CALLBACK):
+                self.check_timer(self.accountManagerState.WAIT_FOR_UPDATE_PORTFOLIO_CALLBACK, 2)
                 if self.accountDownloadEndstatus=='Done':
-                    self.accountManagerState='evey_bar_run'
+                    self.accountManagerState.set_state(
+                    self.accountManagerState.EVERY_BAR_RUN)
 #                    self.display_account_info()
                     
-            if self.accountManagerState=='evey_bar_run':        
+            if self.accountManagerState.is_state(self.accountManagerState.EVERY_BAR_RUN):   
                 # Update self.data using recent bar data
                 for security in self.data:                        
                     self.data[security].update(self.stime)                     
@@ -312,7 +328,7 @@ class BarTrader(IBAccountManager) :  #  define a new client class. All client cl
                 handle_data(self.context, self.data)
 
                 # reset the counter of re_send and update stime_previous
-                self.accountManagerState='sleep'
+                self.accountManagerState.set_state(self.accountManagerState.SLEEP)
                 self.re_send = 0
             
 if __name__ == '__main__' :
