@@ -8,6 +8,10 @@
 *.~
 /src_windows32bit
 /test
+/Log
+/log
+/barBased/Log
+/tickBased/Log
 log.*
 .dropbox
 

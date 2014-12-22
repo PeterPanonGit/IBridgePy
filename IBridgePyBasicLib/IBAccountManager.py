@@ -4,7 +4,8 @@ import datetime, time
 import pandas as pd
 
 from IBridgePy.IBridgePyBasicLib.quantopian import Security, ContextClass, PositionClass, \
-HistClass, create_contract, MarketOrder, create_order, OrderClass, same_security
+HistClass, create_contract, MarketOrder, create_order, OrderClass, same_security, \
+DataClass
 import IBCpp
 from BasicPyLib.FiniteState import FiniteStateClass
 
@@ -54,7 +55,7 @@ class IBAccountManager(IBCpp.IBClient):
         
         # port and clientId
         self.port = port; self.clientId = clientId
-        
+            
         # Id tracker and status flags
         self.nextOrderId_Status = 'none'
         self.nextOrderId = 0
@@ -119,11 +120,50 @@ class IBAccountManager(IBCpp.IBClient):
         if (self.PROGRAM_DEBUG):
             print("set timer", self.timer_start)
         
-    def check_timer(self, step, limit=10):
+    def check_timer(self, step, limit = 10):
         """
-        This should be overwritten by trader class
+        check_timer will check if time limit exceeded for certain
+        steps, including: updated positions, get nextValidId, etc
         """
-        pass
+        timer_now = datetime.datetime.now(tz = self.USeasternTimeZone)
+        change = (timer_now-self.timer_start).total_seconds()
+        if change > limit: # if time limit exceeded
+            if step == self.accountManagerState.WAIT_FOR_INIT_CALLBACK:
+                if self.nextOrderId_Status !='Done':
+                    print 'Time Limit Exceeded when requesting nextValidId', \
+                    step,datetime.datetime.now()
+                    print 'self.nextValidId_status=', self.nextValidId_status
+                    self.set_timer()
+            elif step == self.accountManagerState.WAIT_FOR_DAILY_PRICE_CALLBACK:
+                print 'Time Limit Exceeded when requesting historical daily data', \
+                step, datetime.datetime.now()
+                print 'The content of self.hist_daily'
+                for security in self.data:
+                    print self.data[security].hist_daily.head()
+                if self.re_send < 3:    
+                    print 'Re-send req_daily_price_first'
+                    self.re_send += 1
+                    self.req_hist_price(endtime=datetime.datetime.now())
+                    self.set_timer()
+                else:
+                    print 'Re-send request three times, EXIT'
+                    exit()
+            elif step == self.accountManagerState.WAIT_FOR_BAR_PRICE_CALLBACK:
+                print 'Time Limit Exceeded when requesting historical bar data', \
+                step,datetime.datetime.now()
+                for security in self.data:
+                    print self.data[security].hist_bar.head()
+                if self.re_send < 3:    
+                    self.accountManagerState.set_state(
+                    self.accountManagerState.REQ_BAR_PRICE)
+                    print 'Re-send req_bar_price_first''trade_return'
+                    self.re_send += 1
+                    self.set_timer()
+                else:
+                    print 'Re send request three times, EXIT'
+                    exit()
+            elif step == self.accountManagerState.WAIT_FOR_UPDATE_PORTFOLIO_CALLBACK:
+                self.display('update account failed')
         
     ############### Next Valid ID ################### 
     def nextValidId(self, orderId):
@@ -166,6 +206,40 @@ class IBAccountManager(IBCpp.IBClient):
             self.returned_hist[security].req_id = self.nextHistDataId                     
             self.nextHistDataId += 1
 
+    ################ Real time tick data without volume info #########
+    def tickPrice(self, TickerId, tickType, price, canAutoExecute):
+        """
+        call back function of IB C++ API. This function will get tick prices and 
+        it is up to the specific Trader class to decide how to save the data
+        """
+        for security in self.data: 
+            if security.req_real_time_price_id==TickerId:
+                self.data[security].datetime=self.stime
+                if tickType==1: #Bid price
+                    self.data[security].bid_price=price
+                elif tickType==2: #Ask price
+                    self.data[security].ask_price=price
+                elif tickType==4: #Last price
+                    self.data[security].price = price
+                elif tickType==6: #High daily price
+                    self.data[security].daily_high_price=price
+                elif tickType==7: #Low daily price
+                    self.data[security].daily_low_price=price
+                elif tickType==9: #last close price
+                    pass
+
+                if (self.stime_previous is None or self.stime - 
+                self.stime_previous > self.barSize):
+                    # the begining of the bar
+                    self.data[security].open_price=self.data[security].bid_price
+                    self.data[security].high=self.data[security].bid_price
+                    self.data[security].low=self.data[security].bid_price
+                else:
+                    if tickType==1 and price>self.data[security].high: #Bid price
+                        self.data[security].high=price
+                    if tickType==1 and price<self.data[security].low: #Bid price
+                        self.data[security].low=price
+                        
     ################ Historical data ################################
     def historicalData(self, reqId, date, price_open, price_high, price_low, price_close, volume, barCount, WAP, hasGaps):
         """
@@ -194,6 +268,17 @@ class IBAccountManager(IBCpp.IBClient):
                                                'volume':volume}, index = [date])
                         self.returned_hist[security].hist=self.returned_hist[security].hist.append(newRow)
 
+    def req_real_time_price_check_end(self):
+        """
+        check if all securities have obtained price info
+        """
+        for security in self.data:
+            for ct in [self.data[security].bid_price,self.data[security].ask_price]:                              
+                if ct < 0.0001:
+                    #print ct, 'not ready'
+                    return False
+        return True
+        
     def req_hist_price_check_end(self):
         """
         check if all securities has obtained the requested historical data
@@ -348,6 +433,18 @@ class IBAccountManager(IBCpp.IBClient):
             self.context.portfolio.openOrderBook[orderId].filled=filled
             self.context.portfolio.openOrderBook[orderId].remaining=remaining
             self.context.portfolio.openOrderBook[orderId].status=status
+            if (self.context.portfolio.openOrderBook[orderId].parentOrderId 
+            is not None):
+                if (self.context.portfolio.openOrderBook[orderId].stop is not None):
+                    self.context.portfolio.openOrderBook[
+                    self.context.portfolio.openOrderBook[orderId].parentOrderId].stop_reached = True
+                    print "stop loss executed: ", \
+                    self.context.portfolio.openOrderBook[orderId].contract.symbol
+                if (self.context.portfolio.openOrderBook[orderId].limit is not None):
+                    self.context.portfolio.openOrderBook[
+                    self.context.portfolio.openOrderBook[orderId].parentOrderId].limit_reached = True
+                    print "stop loss executed: ", \
+                    self.context.portfolio.openOrderBook[orderId].contract.symbol                
         
     def openOrder(self, orderId, contract, order, orderstate):
         """

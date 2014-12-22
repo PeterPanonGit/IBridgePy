@@ -190,8 +190,13 @@ class HistClass(object):
         self.status='na'
 
 class OrderClass(object):
-    def __init__(self,orderId, created,stop=None,limit=None,amount=0,sid=None,filled=0,stop_reached=False,limit_reached=False,commission=None,remaining=0,status='na', contract=None, order=None, orderstate=None):
-        self.orderId=orderId        
+    def __init__(self,orderId, created, parentOrderId = None, stop = None, 
+                 limit = None, amount = 0, sid = None, filled = 0,
+                 stop_reached = False, limit_reached = False, commission = None,
+                 remaining = 0, status = 'na', contract = None, order = None, 
+                 orderstate = None):
+        self.orderId=orderId
+        self.parentOrderId = parentOrderId
         self.created=created
         self.stop=stop
         self.limit=limit

@@ -32,7 +32,7 @@ class BarTrader(IBAccountManager) :  #  define a new client class. All client cl
         
         # barSize for BarTrader
         self.barSize = barSize
-        
+            
         # data is used to save the current security price info        
         self.data={}; 
         try:        
@@ -56,96 +56,7 @@ class BarTrader(IBAccountManager) :  #  define a new client class. All client cl
         
         if (self.PROGRAM_DEBUG):
             print("accountCode: ", self.accountCode)
-        
-    def tickPrice(self, TickerId, tickType, price, canAutoExecute):
-        """
-        call back function of IB C++ API. This function will get tick prices and 
-        it is up to the specific Trader class to decide how to save the data
-        """
-        for security in self.data: 
-            if security.req_real_time_price_id==TickerId:
-                self.data[security].datetime=self.stime
-                if tickType==1: #Bid price
-                    self.data[security].bid_price=price
-                elif tickType==2: #Ask price
-                    self.data[security].ask_price=price
-                elif tickType==4: #Last price
-                    pass
-                elif tickType==6: #High daily price
-                    self.data[security].daily_high_price=price
-                elif tickType==7: #Low daily price
-                    self.data[security].daily_low_price=price
-                elif tickType==9: #last close price
-                    pass
 
-                if (self.stime_previous is None or self.stime - 
-                self.stime_previous > self.barSize):
-                    # the begining of the bar
-                    self.data[security].open_price=self.data[security].bid_price
-                    self.data[security].high=self.data[security].bid_price
-                    self.data[security].low=self.data[security].bid_price
-                else:
-                    if tickType==1 and price>self.data[security].high: #Bid price
-                        self.data[security].high=price
-                    if tickType==1 and price<self.data[security].low: #Bid price
-                        self.data[security].low=price
-
-    def req_real_time_price_check_end(self):
-        """
-        check if all securities have obtained price info
-        """
-        for security in self.data:
-            for ct in [self.data[security].bid_price,self.data[security].ask_price]:                              
-                if ct < 0.0001:
-                    #print ct, 'not ready'
-                    return False
-        return True
-                
-    def check_timer(self, step, limit = 10):
-        """
-        check_timer will check if time limit exceeded for certain
-        steps, including: updated positions, get nextValidId, etc
-        """
-        timer_now = datetime.datetime.now(tz = self.USeasternTimeZone)
-        change = (timer_now-self.timer_start).total_seconds()
-        if change > limit: # if time limit exceeded
-            if step == self.accountManagerState.WAIT_FOR_INIT_CALLBACK:
-                if self.nextOrderId_Status !='Done':
-                    print 'Time Limit Exceeded when requesting nextValidId', \
-                    step,datetime.datetime.now()
-                    print 'self.nextValidId_status=', self.nextValidId_status
-                    self.set_timer()
-            elif step == self.accountManagerState.WAIT_FOR_DAILY_PRICE_CALLBACK:
-                print 'Time Limit Exceeded when requesting historical daily data', \
-                step, datetime.datetime.now()
-                print 'The content of self.hist_daily'
-                for security in self.data:
-                    print self.data[security].hist_daily.head()
-                if self.re_send < 3:    
-                    print 'Re-send req_daily_price_first'
-                    self.re_send += 1
-                    self.req_hist_price(endtime=datetime.datetime.now())
-                    self.set_timer()
-                else:
-                    print 'Re-send request three times, EXIT'
-                    exit()
-            elif step == self.accountManagerState.WAIT_FOR_BAR_PRICE_CALLBACK:
-                print 'Time Limit Exceeded when requesting historical bar data', \
-                step,datetime.datetime.now()
-                for security in self.data:
-                    print self.data[security].hist_bar.head()
-                if self.re_send < 3:    
-                    self.accountManagerState.set_state(
-                    self.accountManagerState.REQ_BAR_PRICE)
-                    print 'Re-send req_bar_price_first''trade_return'
-                    self.re_send += 1
-                    self.set_timer()
-                else:
-                    print 'Re send request three times, EXIT'
-                    exit()
-            elif step == self.accountManagerState.WAIT_FOR_UPDATE_PORTFOLIO_CALLBACK:
-                self.display('update account failed')
-                
     ############# trader specific order functions ###################
     def order_quantopian(self, security, amount, style=MarketOrder()):       
         print 'place_order'
@@ -185,7 +96,7 @@ class BarTrader(IBAccountManager) :  #  define a new client class. All client cl
         for ct in self.data:
             if same_security(security, ct):
                 return self.order_quantopian(security, int(math.floor(value/self.data[ct].price)), style=style)
-        self.throwError('order_value_quantopian', 'could not find security')
+#        self.throwError('order_value_quantopian', 'could not find security')
         
     def order_percent_quantopian(self, security, percent, style=MarketOrder()):
         print 'order_percent_quantopian'
@@ -193,7 +104,7 @@ class BarTrader(IBAccountManager) :  #  define a new client class. All client cl
         for ct in self.data:
             if same_security(security, ct):        
                 return self.order_quantopian(security, int(math.floor(self.context.portfolio.portfolio_value/self.data[ct].price)) , style=style)
-        self.throwError('order_percent_quantopian', 'could not find security')
+#        self.throwError('order_percent_quantopian', 'could not find security')
 
 
     def order_target_quantopian(self, security, amount, style=MarketOrder()):
@@ -211,7 +122,7 @@ class BarTrader(IBAccountManager) :  #  define a new client class. All client cl
         for ct in self.data:
             if same_security(security, ct):        
                 return self.order_quantopian(security, int(math.floor((value-hold)/self.data[ct].price)) , style=style)
-        self.throwError('order_target_value_quantopian', 'could not find security')
+#        self.throwError('order_target_value_quantopian', 'could not find security')
 
     def order_target_percent_quantopian(self, security, percent, style=MarketOrder()):
         print 'place_order_percent_value'
@@ -220,7 +131,7 @@ class BarTrader(IBAccountManager) :  #  define a new client class. All client cl
         for ct in self.data:
             if same_security(security, ct):        
                 return self.order_quantopian(security, int(math.floor((percent-hold)*self.context.portfolio.portfolio_value/self.data[ct].price)) , style=style)
-        self.throwError('order_target_percent_quantopian', 'could not find security')
+#        self.throwError('order_target_percent_quantopian', 'could not find security')
         
     def runAlgorithm(self):
         time.sleep(0.1) # sleep for sometime to avoid sending messages too fast
@@ -237,7 +148,7 @@ class BarTrader(IBAccountManager) :  #  define a new client class. All client cl
             if self.accountManagerState.is_state(
                     self.accountManagerState.WAIT_FOR_INIT_CALLBACK): 
                 self.check_timer(self.accountManagerState.WAIT_FOR_INIT_CALLBACK)
-                if self.req_hist_price_check_end(): 
+                if self.req_hist_price_check_end() and self.nextOrderId_Status =='Done': 
                     # update historical data for each security
                     for security in self.returned_hist:
                         self.data[security].hist_daily = \
