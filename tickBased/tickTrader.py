@@ -37,17 +37,17 @@ class TickTrader(IBAccountManager):
         
         # data is used to save the current security price info        
         self.data={}; 
-        try:        
-            if len(self.context.security)>=2:
-                for ct in self.context.security:
-                    self.data[ct] = DataClass()
-        except:
+        if len(self.context.security) >= 2:
+            for ct in self.context.security:
+                self.data[ct] = DataClass()
+                # 0 = trade timestamp; 1 = price_last; 2 = size_last; 3 = record_timestamp
+                self.data[ct].RT_volume = {ct: np.zeros(shape = (0,4)) for 
+                ticker in self.context.security}
+        else:
             self.data[self.context.security] = DataClass()
+            self.data[self.context.security].RT_volume = {ct: np.zeros(shape = (0,4)) for 
+            ticker in self.context.security}
             
-        # 0 = trade timestamp; 1 = price_last; 2 = size_last; 3 = record_timestamp
-        self.price_size_last_matrix = {ticker: np.zeros(shape = (0,4)) for 
-        ticker in self.context.security}
-        
         # max timeframe to be saved in price_size_last_matrix for TickTrader
         self.maxSaveTime = 3600 # seconds        
         
@@ -83,12 +83,12 @@ class TickTrader(IBAccountManager):
                 print "tickString: ", sec.symbol, priceLast, sizeLast, timePy, currentTime
             # update price
             newRow = [float(valueSplit[2])/1000, priceLast, sizeLast, currentTimeStamp]
-            priceSizeLastSymbol = self.price_size_last_matrix[sec]
+            priceSizeLastSymbol = self.data[sec].RT_volume
             priceSizeLastSymbol = np.vstack([priceSizeLastSymbol, newRow])
             # erase data points that go over the limit
             if (timePy - priceSizeLastSymbol[0, 0]) > self.maxSaveTime:
                 priceSizeLastSymbol = priceSizeLastSymbol[1:,:]
-            self.price_size_last_matrix[sec] = priceSizeLastSymbol
+            self.data[sec].RT_volume = priceSizeLastSymbol
             
     def order_with_SL_TP(self, sec, amount, orderId = None, 
                          stopLossPrice = None, takeProfitPrice = None):

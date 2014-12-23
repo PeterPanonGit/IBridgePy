@@ -156,6 +156,8 @@ class DataClass(PrintableClass):
         self.ask_price = None
         self.hist_daily = pd.DataFrame()
         self.hist_bar = pd.DataFrame()
+        # 0 = trade timestamp; 1 = price_last; 2 = size_last; 3 = record_timestamp
+        self.RT_volume = {}
         
     def update(self,time_input):
         self.datetime=time_input

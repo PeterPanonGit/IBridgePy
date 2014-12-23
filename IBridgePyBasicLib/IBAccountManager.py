@@ -47,6 +47,7 @@ class IBAccountManager(IBCpp.IBClient):
         self.stime_previous = None
         self.stime = datetime.datetime.now(tz = self.USeasternTimeZone)
         self.context = ContextClass()
+        self.context.USeasternTimeZone = self.USeasternTimeZone
         self.last_message='na'
         self.minTick = minTick
         
