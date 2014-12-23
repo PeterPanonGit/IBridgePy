@@ -80,7 +80,7 @@ class TickTrader(IBAccountManager):
             priceLast = float(valueSplit[0]); sizeLast = float(valueSplit[1])
             currentTimeStamp = time.mktime(datetime.datetime.now().timetuple())
             if self.PROGRAM_DEBUG:
-                print ticker, priceLast, sizeLast, timePy, currentTime
+                print "tickString: ", sec.symbol, priceLast, sizeLast, timePy, currentTime
             # update price
             newRow = [float(valueSplit[2])/1000, priceLast, sizeLast, currentTimeStamp]
             priceSizeLastSymbol = self.price_size_last_matrix[ticker]
@@ -143,7 +143,10 @@ class TickTrader(IBAccountManager):
         childOrder.orderType = 'STP'
         childOrder.auxPrice = self.roundToMinTick(stopLossPrice)
         childOrder.parentId = parentOrderId
-        childOrder.transmit = True
+        if (takeProfitPrice is not None):
+            childOrder.transmit = True
+        else:
+            childOrder.transmit = False
         childOrder.account = self.accountCode
         childOrderId = self.nextOrderId
         childOrder.ocaGroup = str(parentOrderId)
