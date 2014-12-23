@@ -194,6 +194,7 @@ class TickTrader(IBAccountManager):
         
     ############# this function is running in an infinite loop
     def runAlgorithm(self):
+        time.sleep(0.1) # sleep to avoid exceeding IB's max data rate
         self.reqCurrentTime()
         # initialize
         if self.traderState.is_state(self.traderState.INIT):
