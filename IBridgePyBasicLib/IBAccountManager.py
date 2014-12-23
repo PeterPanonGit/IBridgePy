@@ -409,7 +409,7 @@ class IBAccountManager(IBCpp.IBClient):
         of a account
         """
         if (self.TRADE_DEBUG):
-            print 'position',account, contract.symbol+'.'+contract.currency, position,price
+            print 'position callback function: ',account, contract.symbol+'.'+contract.currency, position,price
         found = False
         for security in self.data:
             if contract.symbol==security.symbol and contract.secType==security.secType and contract.currency==security.currency:
@@ -452,7 +452,7 @@ class IBAccountManager(IBCpp.IBClient):
         by orderId
         """
         if (self.TRADE_DEBUG):
-            print 'openOrder',orderId, contract.symbol+'.'+contract.currency, order.action,order.totalQuantity,orderstate.commission, orderstate.commissionCurrency,orderstate.maxCommission, orderstate.minCommission,orderstate.warningText      
+            print 'openOrder callback function: ',orderId, contract.symbol+'.'+contract.currency, order.action,order.totalQuantity,orderstate.commission, orderstate.commissionCurrency,orderstate.maxCommission, orderstate.minCommission,orderstate.warningText      
         if orderId in self.context.portfolio.openOrderBook:
             if self.context.portfolio.openOrderBook[orderId].contract!=contract:
                 self.context.portfolio.openOrderBook[orderId].contract=contract                        

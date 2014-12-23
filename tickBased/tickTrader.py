@@ -96,12 +96,13 @@ class TickTrader(IBAccountManager):
         This function make orders. When amount > 0 it is BUY and when amount < 0 it is SELL
         '''
         # fill order info
-        order = IBCpp.Order()
         if amount > 0:
-            order.action = 'BUY'
+            orderAction = 'BUY'
+            orderReverseAction = 'SELL'
             amount = int(amount)
         elif amount < 0:
-            order.action = 'SELL'
+            orderAction = 'SELL'
+            orderReverseAction = 'BUY'
             amount = int(np.abs(amount))
         else:
             print "WARNING: order amount is 0!"
@@ -115,14 +116,14 @@ class TickTrader(IBAccountManager):
         ### place order
         # market order
         marketOrder = IBCpp.Order()
-        marketOrder.action = 'BUY'
+        marketOrder.action = orderAction
         marketOrder.totalQuantity = amount
         marketOrder.orderType = 'MKT'
         marketOrder.transmit = False
         marketOrder.account = self.accountCode
         parentOrderId = self.nextOrderId
         self.placeOrder(parentOrderId, contract, marketOrder)
-        if not (orderId in self.context.portfolio.openOrderBook):
+        if not (parentOrderId in self.context.portfolio.openOrderBook):
             self.context.portfolio.openOrderBook[parentOrderId] = \
                 OrderClass(orderId = parentOrderId, parentOrderId = None,
                     created=datetime.datetime.now(),
@@ -137,7 +138,7 @@ class TickTrader(IBAccountManager):
         self.nextOrderId += 1
         # stop sell order: stop loss
         childOrder = IBCpp.Order()
-        childOrder.action = 'SELL'
+        childOrder.action = orderReverseAction
         childOrder.totalQuantity = amount
         childOrder.orderType = 'STP'
         childOrder.auxPrice = self.roundToMinTick(stopLossPrice)
@@ -145,9 +146,9 @@ class TickTrader(IBAccountManager):
         childOrder.transmit = True
         childOrder.account = self.accountCode
         childOrderId = self.nextOrderId
-        childOrder.ocaGroup = str(orderId)
+        childOrder.ocaGroup = str(parentOrderId)
         self.placeOrder(childOrderId, contract, childOrder)
-        if not (orderId in self.context.portfolio.openOrderBook):
+        if not (childOrderId in self.context.portfolio.openOrderBook):
             self.context.portfolio.openOrderBook[childOrderId] = \
                 OrderClass(orderId = childOrderId, parentOrderId = parentOrderId,
                     created=datetime.datetime.now(),
@@ -164,7 +165,7 @@ class TickTrader(IBAccountManager):
         # Limit order: an order to buy or sell at a specified price or better.
         if (takeProfitPrice is not None):
             childOrder = IBCpp.Order()
-            childOrder.action = 'SELL'
+            childOrder.action = orderReverseAction
             childOrder.totalQuantity = amount
             childOrder.orderType = 'LMT'
             childOrder.lmtPrice = self.roundToMinTick(takeProfitPrice)
@@ -172,9 +173,9 @@ class TickTrader(IBAccountManager):
             childOrder.transmit = True
             childOrder.account = self.accountCode
             childOrderId = self.nextOrderId
-            childOrder.ocaGroup = str(orderId)
+            childOrder.ocaGroup = str(parentOrderId)
             self.placeOrder(childOrderId, contract, childOrder)
-            if not (orderId in self.context.portfolio.openOrderBook):
+            if not (childOrderId in self.context.portfolio.openOrderBook):
                 self.context.portfolio.openOrderBook[childOrder] = \
                     OrderClass(orderId = childOrderId, parentOrderId = parentOrderId,
                         created=datetime.datetime.now(),
