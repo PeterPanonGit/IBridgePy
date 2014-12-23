@@ -121,9 +121,8 @@ class TickTrader(IBAccountManager):
         marketOrder.transmit = False
         parentOrderId = self.nextOrderId
         self.placeOrder(parentOrderId, contract, marketOrder)
-        self.nextOrderId += 1
         if not (orderId in self.context.portfolio.openOrderBook):
-            self.context.portfolio.openOrderBook[self.nextOrderId] = \
+            self.context.portfolio.openOrderBook[parentOrderId] = \
                 OrderClass(orderId = parentOrderId, parentOrderId = None,
                     created=datetime.datetime.now(),
                     stop = None,
@@ -134,6 +133,7 @@ class TickTrader(IBAccountManager):
                     contract = contract,
                     order = marketOrder,
                     orderstate = None)
+        self.nextOrderId += 1
         # stop sell order: stop loss
         childOrder = IBCpp.Order()
         childOrder.action = 'SELL'
@@ -145,9 +145,8 @@ class TickTrader(IBAccountManager):
         childOrderId = self.nextOrderId
         childOrder.ocaGroup = str(orderId)
         self.placeOrder(childOrderId, contract, childOrder)
-        self.nextOrderId += 1
         if not (orderId in self.context.portfolio.openOrderBook):
-            self.context.portfolio.openOrderBook[self.nextOrderId] = \
+            self.context.portfolio.openOrderBook[childOrderId] = \
                 OrderClass(orderId = childOrderId, parentOrderId = parentOrderId,
                     created=datetime.datetime.now(),
                     stop = stopLossPrice,
@@ -158,6 +157,7 @@ class TickTrader(IBAccountManager):
                     contract = contract,
                     order = childOrder,
                     orderstate = None)
+        self.nextOrderId += 1
         # limit sell order: take profit
         # Limit order: an order to buy or sell at a specified price or better.
         if (takeProfitPrice is not None):
@@ -171,9 +171,8 @@ class TickTrader(IBAccountManager):
             childOrderId = self.nextOrderId
             childOrder.ocaGroup = str(orderId)
             self.placeOrder(childOrderId, contract, childOrder)
-            self.nextOrderId += 1
             if not (orderId in self.context.portfolio.openOrderBook):
-                self.context.portfolio.openOrderBook[self.nextOrderId] = \
+                self.context.portfolio.openOrderBook[childOrder] = \
                     OrderClass(orderId = childOrderId, parentOrderId = parentOrderId,
                         created=datetime.datetime.now(),
                         stop = None,
@@ -183,7 +182,8 @@ class TickTrader(IBAccountManager):
                         status = 'PreSubmitted',
                         contract = contract,
                         order = childOrder,
-                        orderstate = None)            
+                        orderstate = None)   
+            self.nextOrderId += 1
         # print order placement time    
         print 'order placed at: ', datetime.datetime.now(self.USeasternTimeZone)          
     

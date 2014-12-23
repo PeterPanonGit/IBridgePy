@@ -235,9 +235,9 @@ class IBAccountManager(IBCpp.IBClient):
                     self.data[security].high=self.data[security].bid_price
                     self.data[security].low=self.data[security].bid_price
                 else:
-                    if tickType==1 and price>self.data[security].high: #Bid price
+                    if tickType==4 and price>self.data[security].high: #Bid price
                         self.data[security].high=price
-                    if tickType==1 and price<self.data[security].low: #Bid price
+                    if tickType==4 and price<self.data[security].low: #Bid price
                         self.data[security].low=price
                         
     ################ Historical data ################################
@@ -434,7 +434,7 @@ class IBAccountManager(IBCpp.IBClient):
             self.context.portfolio.openOrderBook[orderId].remaining=remaining
             self.context.portfolio.openOrderBook[orderId].status=status
             if (self.context.portfolio.openOrderBook[orderId].parentOrderId 
-            is not None):
+            is not None and status == 'Filled'):
                 if (self.context.portfolio.openOrderBook[orderId].stop is not None):
                     self.context.portfolio.openOrderBook[
                     self.context.portfolio.openOrderBook[orderId].parentOrderId].stop_reached = True

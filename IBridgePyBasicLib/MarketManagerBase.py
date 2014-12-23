@@ -52,7 +52,7 @@ class __USEasternMarketObject__(object):
         if market closes, it will turn the marketState back to "sleep"
         """
         while (self.marketState.is_state(self.marketState.SLEEP)):
-            time.sleep(1)
+            time.sleep(1) # check if market is open every one second
             currentTime = datetime.datetime.now(self.USeasternTimeZone)
             dataDate = str(currentTime).split(' ')[0]
             startTime = datetime.datetime.strptime(dataDate + ' ' + market_start_time , '%Y-%m-%d %H:%M:%S')
