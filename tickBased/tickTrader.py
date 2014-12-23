@@ -72,7 +72,7 @@ class TickTrader(IBAccountManager):
         trade price and volume information. User show define in this function
         how the last trade price and volume should be saved
         """
-        ticker = self.context.security[tickerId]
+        sec = self.context.security[tickerId]
         currentTime = datetime.datetime.now(tz = self.USeasternTimeZone)
         valueSplit = value.split(';')
         if len(valueSplit) > 1 and float(valueSplit[1]) > 0:
@@ -83,12 +83,12 @@ class TickTrader(IBAccountManager):
                 print "tickString: ", sec.symbol, priceLast, sizeLast, timePy, currentTime
             # update price
             newRow = [float(valueSplit[2])/1000, priceLast, sizeLast, currentTimeStamp]
-            priceSizeLastSymbol = self.price_size_last_matrix[ticker]
+            priceSizeLastSymbol = self.price_size_last_matrix[sec]
             priceSizeLastSymbol = np.vstack([priceSizeLastSymbol, newRow])
             # erase data points that go over the limit
             if (timePy - priceSizeLastSymbol[0, 0]) > self.maxSaveTime:
                 priceSizeLastSymbol = priceSizeLastSymbol[1:,:]
-            self.price_size_last_matrix[ticker] = priceSizeLastSymbol
+            self.price_size_last_matrix[sec] = priceSizeLastSymbol
             
     def order_with_SL_TP(self, sec, amount, orderId = None, 
                          stopLossPrice = None, takeProfitPrice = None):
