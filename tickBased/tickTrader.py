@@ -143,8 +143,8 @@ class TickTrader(IBAccountManager):
         childOrder.orderType = 'STP'
         childOrder.auxPrice = self.roundToMinTick(stopLossPrice)
         childOrder.parentId = parentOrderId
-        if (takeProfitPrice is not None):
-            childOrder.transmit = True
+        if (takeProfitPrice is None):
+            childOrder.transmit = True # if not limit order transmit STP order
         else:
             childOrder.transmit = False
         childOrder.account = self.accountCode
