@@ -119,6 +119,7 @@ class TickTrader(IBAccountManager):
         marketOrder.totalQuantity = amount
         marketOrder.orderType = 'MKT'
         marketOrder.transmit = False
+        marketOrder.account = self.accountCode
         parentOrderId = self.nextOrderId
         self.placeOrder(parentOrderId, contract, marketOrder)
         if not (orderId in self.context.portfolio.openOrderBook):
@@ -142,6 +143,7 @@ class TickTrader(IBAccountManager):
         childOrder.auxPrice = self.roundToMinTick(stopLossPrice)
         childOrder.parentId = parentOrderId
         childOrder.transmit = True
+        childOrder.account = self.accountCode
         childOrderId = self.nextOrderId
         childOrder.ocaGroup = str(orderId)
         self.placeOrder(childOrderId, contract, childOrder)
@@ -168,6 +170,7 @@ class TickTrader(IBAccountManager):
             childOrder.lmtPrice = self.roundToMinTick(takeProfitPrice)
             childOrder.parentId = parentOrderId
             childOrder.transmit = True
+            childOrder.account = self.accountCode
             childOrderId = self.nextOrderId
             childOrder.ocaGroup = str(orderId)
             self.placeOrder(childOrderId, contract, childOrder)
