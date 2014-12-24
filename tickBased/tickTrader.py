@@ -41,12 +41,10 @@ class TickTrader(IBAccountManager):
             for ct in self.context.security:
                 self.data[ct] = DataClass()
                 # 0 = trade timestamp; 1 = price_last; 2 = size_last; 3 = record_timestamp
-                self.data[ct].RT_volume = {ct: np.zeros(shape = (0,4)) for 
-                ticker in self.context.security}
+                self.data[ct].RT_volume = np.zeros(shape = (0,4))
         else:
             self.data[self.context.security] = DataClass()
-            self.data[self.context.security].RT_volume = {ct: np.zeros(shape = (0,4)) for 
-            ticker in self.context.security}
+            self.data[self.context.security].RT_volume = np.zeros(shape = (0,4))
             
         # max timeframe to be saved in price_size_last_matrix for TickTrader
         self.maxSaveTime = 3600 # seconds        
