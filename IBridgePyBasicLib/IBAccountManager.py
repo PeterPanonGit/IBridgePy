@@ -2,6 +2,7 @@
 
 import datetime, time
 import pandas as pd
+import logging
 
 from IBridgePy.IBridgePyBasicLib.quantopian import Security, ContextClass, PositionClass, \
 HistClass, create_contract, MarketOrder, create_order, OrderClass, same_security, \
@@ -67,29 +68,28 @@ class IBAccountManager(IBCpp.IBClient):
         self.PROGRAM_DEBUG = PROGRAM_DEBUG
         self.TRADE_DEBUG = TRADE_DEBUG
         
+        # trader log
+        logger = logging.getLogger('TraderLog')
+        self.log = logger
+        
         # setup IB's log file and message level
         self.logFileName = "IB_system_log.txt"
         self.logOn()
         self.echo = True
         self.addMessageLevel(IBCpp.MsgLevel.SYSERR)
         self.addMessageLevel(IBCpp.MsgLevel.IBINFO)
-        if (self.PROGRAM_DEBUG):
-            print "message level: ", "{0:b}".format(self.getMessageLevel())
-
-    def display(self,message):
-        if message!=self.last_message:
-            print message, datetime.datetime.now()
-            self.last_message=message
+        self.log.info(__name__ + ": " + 
+        "IB message level: ", "{0:b}".format(self.getMessageLevel()))
             
     def error(self, errorId, errorCode, errorString):
         """
         only print real error messages, which is errorId < 2000 in IB's error
         message system, or program is in debug mode
         """
-        if self.PROGRAM_DEBUG or errorCode < 2000:
-            print 'errorId = ' + str(errorId), 'errorCode = ' + str(errorCode)
-            print 'error message: ' + errorString
-
+        if errorCode < 2000:
+            self.log.error(__name__ + ": " + 'errorId = ' + str(errorId) + 
+            'errorCode = ' + str(errorCode) + '\n' + 'error message: ' + errorString)
+            
     def currentTime(self, tm):
         """
         IB C++ API call back function. Return system time in datetime instance
@@ -106,8 +106,8 @@ class IBAccountManager(IBCpp.IBClient):
         $0.01. So if the user made calculations on any price, the calculated
         price must be round using this function to the minTick, e.g., $0.01
         """
-        if (self.TRADE_DEBUG):
-            print 'roundToMinTick price: ', price, type(price), type(self.minTick)
+        self.log.debug(__name__ + ": " + 'roundToMinTick price: ' + str(price) +
+        str(type(price)) + str(type(self.minTick)))
         return int(price / self.minTick) * self.minTick
     ######################   SUPPORT ############################33
 
@@ -118,8 +118,7 @@ class IBAccountManager(IBCpp.IBClient):
         set self.timer_start to current time so as to start the timer
         """
         self.timer_start = datetime.datetime.now(tz = self.USeasternTimeZone)
-        if (self.PROGRAM_DEBUG):
-            print("set timer", self.timer_start)
+        self.log.debug(__name__ + ": " + "set timer" + str(self.timer_start))
         
     def check_timer(self, step, limit = 10):
         """
@@ -131,40 +130,41 @@ class IBAccountManager(IBCpp.IBClient):
         if change > limit: # if time limit exceeded
             if step == self.accountManagerState.WAIT_FOR_INIT_CALLBACK:
                 if self.nextOrderId_Status !='Done':
-                    print 'Time Limit Exceeded when requesting nextValidId', \
-                    step,datetime.datetime.now()
-                    print 'self.nextValidId_status=', self.nextValidId_status
+                    self.log.error(__name__ + ": " + 'Time Limit Exceeded when \
+                    requesting nextValidId' + str(step,datetime.datetime.now()) + \
+                    '\n' + 'self.nextValidId_status = ' + str(self.nextValidId_status))
                     self.set_timer()
             elif step == self.accountManagerState.WAIT_FOR_DAILY_PRICE_CALLBACK:
-                print 'Time Limit Exceeded when requesting historical daily data', \
-                step, datetime.datetime.now()
-                print 'The content of self.hist_daily'
+                self.log.error(__name__ + ": " + 'Time Limit Exceeded when \
+                requesting historical daily data' + step, datetime.datetime.now() + \
+                '\n' + 'The content of self.hist_daily: ')
                 for security in self.data:
-                    print self.data[security].hist_daily.head()
+                    self.log.info(__name__ + ": " + str(self.data[security].hist_daily.head()))
                 if self.re_send < 3:    
-                    print 'Re-send req_daily_price_first'
+                    self.log.error(__name__ + ": " + 'Re-send req_daily_price_first')
                     self.re_send += 1
                     self.req_hist_price(endtime=datetime.datetime.now())
                     self.set_timer()
                 else:
-                    print 'Re-send request three times, EXIT'
+                    self.log.error(__name__ + ": " + 'Re-send request three times, EXIT')
                     exit()
             elif step == self.accountManagerState.WAIT_FOR_BAR_PRICE_CALLBACK:
-                print 'Time Limit Exceeded when requesting historical bar data', \
-                step,datetime.datetime.now()
+                self.log.error(__name__ + ": " + 'Time Limit Exceeded when \
+                requesting historical bar data' + \
+                str(step) + str(datetime.datetime.now()))
                 for security in self.data:
-                    print self.data[security].hist_bar.head()
+                    self.log.info(__name__ + ": " + str(self.data[security].hist_bar.head()))
                 if self.re_send < 3:    
                     self.accountManagerState.set_state(
                     self.accountManagerState.REQ_BAR_PRICE)
-                    print 'Re-send req_bar_price_first''trade_return'
+                    self.log.error(__name__ + ": " + 'Re-send req_bar_price_first')
                     self.re_send += 1
                     self.set_timer()
                 else:
-                    print 'Re send request three times, EXIT'
+                    self.log.error(__name__ + ": " + 'Re send request three times, EXIT')
                     exit()
             elif step == self.accountManagerState.WAIT_FOR_UPDATE_PORTFOLIO_CALLBACK:
-                self.display('update account failed')
+                self.log.error(__name__ + ": " + 'update account failed')
         
     ############### Next Valid ID ################### 
     def nextValidId(self, orderId):
@@ -174,8 +174,7 @@ class IBAccountManager(IBCpp.IBClient):
         stage of the program and results are recorded in startingNextValidIdNumber,
         then the orderId is track by the program when placing orders
         """        
-        if (self.PROGRAM_DEBUG):
-            print 'next valid order Id = ' + str(orderId)
+        self.log.info(__name__ + ": " + 'next valid order Id = ' + str(orderId))
         self.nextOrderId = orderId
         self.nextOrderId_Status = 'Done'
         
@@ -307,7 +306,8 @@ class IBAccountManager(IBCpp.IBClient):
         elif field=='volume':
             inpt='volume'
         else:
-            print 'history_quantopian, field is not handled', field
+            self.log.error(__name__ + ": " + 'history_quantopian, field is not handled' + 
+            str(field))
             exit()
             
         result=pd.DataFrame()
@@ -332,21 +332,27 @@ class IBAccountManager(IBCpp.IBClient):
         """
         print account info such as position values in format ways
         """
-        print 'capital_used=',self.context.portfolio.capital_used
-        print 'cash=',self.context.portfolio.cash
-        print 'pnl=',self.context.portfolio.pnl
-        print 'portfolio_value=',self.context.portfolio.portfolio_value
-        print 'positions_value=',self.context.portfolio.positions_value
-        print 'returns=',self.context.portfolio.returns
-        print 'starting_cash=',self.context.portfolio.starting_cash
-        print 'start_date=',self.context.portfolio.start_date
+        self.log.info(__name__ + ": " + 'capital_used=' + str(self.context.portfolio.capital_used))
+        self.log.info('cash=' + str(self.context.portfolio.cash))
+        self.log.info('pnl=' + str(self.context.portfolio.pnl))
+        self.log.info('portfolio_value=' + str(self.context.portfolio.portfolio_value))
+        self.log.info('positions_value=' + str(self.context.portfolio.positions_value))
+        self.log.info('returns=' + str(self.context.portfolio.returns))
+        self.log.info('starting_cash=' + str(self.context.portfolio.starting_cash))
+        self.log.info('start_date=' + str(self.context.portfolio.start_date))
         
-        print 'POSITIONS:'
+        self.log.info('POSITIONS:')
         for ct in self.context.portfolio.positions:
-            print ct.symbol+ct.currency+ct.secType, self.context.portfolio.positions[ct]
-        print 'OPEN ORDERS:'
+            self.log.info(ct.symbol+ct.currency+ct.secType + ': ' + 
+            str(self.context.portfolio.positions[ct]))
+        self.log.info('OPEN ORDERS:')
         for ct in self.context.portfolio.openOrderBook:
-            print ct, self.context.portfolio.openOrderBook[ct].contract.symbol+'.'+self.context.portfolio.openOrderBook[ct].contract.currency+'.'+self.context.portfolio.openOrderBook[ct].contract.secType,self.context.portfolio.openOrderBook[ct].amount,self.context.portfolio.openOrderBook[ct].status
+            self.log.info(str(ct) + ': ' + 
+            self.context.portfolio.openOrderBook[ct].contract.symbol + '.' + 
+            self.context.portfolio.openOrderBook[ct].contract.currency + '.' + 
+            self.context.portfolio.openOrderBook[ct].contract.secType + 
+            str(self.context.portfolio.openOrderBook[ct].amount) + 
+            self.context.portfolio.openOrderBook[ct].status)
             
     ############## Account management ####################
     def updateAccountValue(self, key, value, currency, accountName):
@@ -380,8 +386,7 @@ class IBAccountManager(IBCpp.IBClient):
 #        pass
     
     def accountDownloadEnd(self, accountName):
-        if (self.TRADE_DEBUG):
-            print 'accountDownloadEnd', accountName
+        self.log.info(__name__ + ": " + 'accountDownloadEnd' + str(accountName))
         if (self.context.portfolio.cash > 0 and self.context.portfolio.capital_used > 0):
             self.context.portfolio.capital_used=self.context.portfolio.positions_value-self.context.portfolio.pnl
             self.context.portfolio.returns=self.context.portfolio.portfolio_value/(self.context.portfolio.capital_used+self.context.portfolio.cash)-1.0
@@ -390,10 +395,11 @@ class IBAccountManager(IBCpp.IBClient):
         self.reqAccountUpdates(False, self.accountCode) 
  
     def accountSummary(self, reqID, account, tag, value, currency):
-        print 'accountSummary', reqID, account, tag, value, currency
+        self.log.info(__name__ + ": " + 'accountSummary' + str(reqID) + str(account) + str(tag) + 
+        str(value) + str(currency))
 
     def accountSummaryEnd(self, reqId):
-        print 'accountSummaryEnd', reqId   
+        self.log.info(__name__ + ": " + 'accountSummaryEnd' + str(reqId))
 
     def execDetails(self, reqId, contract, execution):
         pass        
@@ -409,15 +415,16 @@ class IBAccountManager(IBCpp.IBClient):
         call back function of IB C++ API which updates the position of a contract
         of a account
         """
-        if (self.TRADE_DEBUG):
-            print 'position callback function: ',account, contract.symbol+'.'+contract.currency, position,price
+        self.log.info(__name__ + ": " + str(account) + str(contract.symbol) + '.' + 
+        str(contract.currency) + ', ' + str(position) + ', ' + str(price))
         found = False
         for security in self.data:
             if contract.symbol==security.symbol and contract.secType==security.secType and contract.currency==security.currency:
                 self.context.portfolio.positions[security]=PositionClass(amount=position,cost_basis=price,sid=security)
                 found = True                
-        if (not found and self.PROGRAM_DEBUG):
-            print 'Unexpected security', contract.symbol + '.' + contract.currency
+        if (not found):
+            self.log.error(__name__ + ": " + 'Unexpected security' + contract.symbol 
+            + '.' + str(contract.currency))
             #if contract.secType=='STK':            
             #    tp=Security(contract.symbol)
             #elif contract.secType=='CASH':
@@ -439,21 +446,22 @@ class IBAccountManager(IBCpp.IBClient):
                 if (self.context.portfolio.openOrderBook[orderId].stop is not None):
                     self.context.portfolio.openOrderBook[
                     self.context.portfolio.openOrderBook[orderId].parentOrderId].stop_reached = True
-                    print "stop loss executed: ", \
-                    self.context.portfolio.openOrderBook[orderId].contract.symbol
+                    self.log.info(__name__ + ": " + "stop loss executed: " + 
+                    self.context.portfolio.openOrderBook[orderId].contract.symbol)
                 if (self.context.portfolio.openOrderBook[orderId].limit is not None):
                     self.context.portfolio.openOrderBook[
                     self.context.portfolio.openOrderBook[orderId].parentOrderId].limit_reached = True
-                    print "stop loss executed: ", \
-                    self.context.portfolio.openOrderBook[orderId].contract.symbol                
+                    self.log.info(__name__ + ": " + "stop loss executed: " +
+                    self.context.portfolio.openOrderBook[orderId].contract.symbol)               
         
     def openOrder(self, orderId, contract, order, orderstate):
         """
         call back function of IB C++ API which updates the open orders indicated
         by orderId
         """
-        if (self.TRADE_DEBUG):
-            print 'openOrder callback function: ',orderId, contract.symbol+'.'+contract.currency, order.action,order.totalQuantity,orderstate.commission, orderstate.commissionCurrency,orderstate.maxCommission, orderstate.minCommission,orderstate.warningText      
+        self.log.info(__name__ + ": " + str(orderId) + ', ' + str(contract.symbol) + 
+        '.' + str(contract.currency) + ', ' + str(order.action) + ', ' + 
+        str(order.totalQuantity))
         if orderId in self.context.portfolio.openOrderBook:
             if self.context.portfolio.openOrderBook[orderId].contract!=contract:
                 self.context.portfolio.openOrderBook[orderId].contract=contract                        

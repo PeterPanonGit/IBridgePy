@@ -4,6 +4,8 @@ Module MarketManager
 
 """
 import time, datetime, pytz
+import logging
+import os
 
 from BasicPyLib.FiniteState import FiniteStateClass
 
@@ -100,8 +102,8 @@ class MarketManager(__USEasternMarketObject__):
             
         # sync timezone
         self.IBClient.USeasternTimeZone = self.USeasternTimeZone
-        if (self.IBClient.PROGRAM_DEBUG):
-            print("accountCode: ", self.IBClient.accountCode) 
+        self.IBClient.log.info(__name__ + ": " + "accountCode: " + 
+        str(self.IBClient.accountCode))
             
     ######### this part do real trading with IB
     def init_obj(self):
@@ -109,15 +111,29 @@ class MarketManager(__USEasternMarketObject__):
         initialzation of the connection to IB
         updated account
         """
-        # trader log file for everyday trading log
+        logger = logging.getLogger('TraderLog')
+        logger.setLevel(logging.NOTSET)
+        # create a file handler
         self.todayDateStr = time.strftime("%Y-%m-%d")
-        self.IBClient.logFile = open('Log/TraderLog_' + self.todayDateStr + '.txt', 'w')
+        if not os.path.exists('Log'):
+            os.makedirs('Log')
+        file_handler = logging.FileHandler('Log/TraderLog_' + self.todayDateStr + '.txt', mode = 'w')
+        file_handler.setLevel(logging.NOTSET)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.NOTSET)
+        # create a logging format
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
+        # add the handlers to the logger
+        logger.addHandler(file_handler)        
+        # trader log for everyday trading log
+        self.IBClient.log = logger
         
         # connect to IB server, TWS is the default
         self.IBClient.connect("", self.IBClient.port, self.IBClient.clientId) # connect to server
-        if (self.PROGRAM_DEBUG):
-            print("Connected to IB, port = ", self.IBClient.port, ", ClientID = ", \
-                self.IBClient.clientId)
+        self.IBClient.log.info(__name__ + ": " + "Connected to IB, port = " + 
+        str(self.IBClient.port) + ", ClientID = " + str(self.IBClient.clientId))
             
     def run_client_algorithm(self):
         '''
@@ -134,4 +150,7 @@ class MarketManager(__USEasternMarketObject__):
         disconnect from IB and close log file
         """
         self.IBClient.disconnect()
-        self.IBClient.logFile.close()
+        handlers = self.IBClient.log.handlers[:]
+        for handler in handlers:
+            handler.close()
+            self.IBClient.log.removeHandler(handler)

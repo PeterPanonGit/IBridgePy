@@ -61,8 +61,7 @@ class TickTrader(IBAccountManager):
         self.reqPositions()
         self.context.portfolio.start_date=datetime.datetime.now()
         
-        if (self.PROGRAM_DEBUG):
-            print("accountCode: ", self.accountCode)
+        self.log.info(__name__ + ": " + "accountCode: " + str(self.accountCode))
     
     def tickString(self, tickerId, field, value):
         """
@@ -77,8 +76,8 @@ class TickTrader(IBAccountManager):
             timePy = float(valueSplit[2])/1000
             priceLast = float(valueSplit[0]); sizeLast = float(valueSplit[1])
             currentTimeStamp = time.mktime(datetime.datetime.now().timetuple())
-            if self.PROGRAM_DEBUG:
-                print "tickString: ", sec.symbol, priceLast, sizeLast, timePy, currentTime
+            self.log.debug(__name__ + ', ' + str(sec.symbol) + ', ' + str(priceLast)
+            + str(sizeLast) + ', ' + str(timePy) + ', ' + str(currentTime))
             # update price
             newRow = [float(valueSplit[2])/1000, priceLast, sizeLast, currentTimeStamp]
             priceSizeLastSymbol = self.data[sec].RT_volume
@@ -103,11 +102,11 @@ class TickTrader(IBAccountManager):
             orderReverseAction = 'BUY'
             amount = int(np.abs(amount))
         else:
-            print "WARNING: order amount is 0!"
+            self.log.warning("order amount is 0!")
             return
             
         if (stopLossPrice is None):
-            print "WARNING: can not place an order without stop loss!"
+            self.log.warning("can not place an order without stop loss!")
             return
         # fill contract info
         contract = create_contract(sec)
@@ -190,7 +189,7 @@ class TickTrader(IBAccountManager):
                         orderstate = None)   
             self.nextOrderId += 1
         # print order placement time    
-        print 'order placed at: ', datetime.datetime.now(self.USeasternTimeZone)          
+        self.log.info(__name__ + ": " + 'order placed at: ' + str(datetime.datetime.now(self.USeasternTimeZone)))
     
         return self.nextOrderId
         
@@ -231,6 +230,7 @@ if __name__ == "__main__":
     trader = TickTrader()
     ########## API
     order_with_SL_TP = trader.order_with_SL_TP
+    log = trader.log
     ##########
     
     ###### read in the algorithm script
@@ -245,6 +245,7 @@ if __name__ == "__main__":
     trader.setup(PROGRAM_DEBUG = True, accountCode = settings['AccountCode'][0])
         
     c = MarketManager(PROGRAM_DEBUG = True, trader = trader)
-    c.run_according_to_market(market_close_time = '23:59:00')
+    c.run_according_to_market(market_start_time = '9:29:55', 
+                              market_close_time = '16:00:00')
     
     print("Finished!")
