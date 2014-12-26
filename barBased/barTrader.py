@@ -27,20 +27,8 @@ class BarTrader(IBAccountManager) :  #  define a new client class. All client cl
             TRADE_DEBUG = TRADE_DEBUG, USeasternTimeZone = USeasternTimeZone, 
             accountCode = accountCode, minTick = minTick, port = port, clientId = clientId) 
         
-        # call Quantopian-like user API function
-        initialize(self.context)
-        
         # barSize for BarTrader
         self.barSize = barSize
-            
-        # data is used to save the current security price info        
-        self.data={}; 
-        try:        
-            if len(self.context.security)>=2:
-                for ct in self.context.security:
-                    self.data[ct] = DataClass()
-        except:
-            self.data[self.context.security] = DataClass()
             
         # traderState
         class TraderStateClass(FiniteStateClass):
@@ -57,6 +45,18 @@ class BarTrader(IBAccountManager) :  #  define a new client class. All client cl
         if (self.PROGRAM_DEBUG):
             print("accountCode: ", self.accountCode)
 
+    def API_initialize(self):
+        # call Quantopian-like user API function
+        initialize(self.context)
+        # data is used to save the current security price info        
+        self.data={}; 
+        try:        
+            if len(self.context.security)>=2:
+                for ct in self.context.security:
+                    self.data[ct] = DataClass()
+        except:
+            self.data[self.context.security] = DataClass()
+        
     ############# trader specific order functions ###################
     def order_quantopian(self, security, amount, style=MarketOrder()):       
         print 'place_order'

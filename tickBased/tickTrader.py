@@ -6,6 +6,7 @@ Module IBClient, Created on Wed Dec 17 13:04:49 2014
 """
 import datetime, time, pytz
 import numpy as np
+import logging
 
 import IBCpp  # IBCpp.pyd is the Python wrapper to IB C++ API
 from IBridgePy.IBridgePyBasicLib.quantopian import Security, ContextClass, \
@@ -31,23 +32,9 @@ class TickTrader(IBAccountManager):
         super(TickTrader, self).setup(PROGRAM_DEBUG = PROGRAM_DEBUG, 
             TRADE_DEBUG = TRADE_DEBUG, USeasternTimeZone = USeasternTimeZone, 
             accountCode = accountCode, minTick = minTick, port = port, clientId = clientId) 
-        
-        # call Quantopian-like user API function
-        initialize(self.context)
-        
-        # data is used to save the current security price info        
-        self.data={}; 
-        if len(self.context.security) >= 2:
-            for ct in self.context.security:
-                self.data[ct] = DataClass()
-                # 0 = trade timestamp; 1 = price_last; 2 = size_last; 3 = record_timestamp
-                self.data[ct].RT_volume = np.zeros(shape = (0,4))
-        else:
-            self.data[self.context.security] = DataClass()
-            self.data[self.context.security].RT_volume = np.zeros(shape = (0,4))
             
         # max timeframe to be saved in price_size_last_matrix for TickTrader
-        self.maxSaveTime = 3600 # seconds        
+        self.maxSaveTime = 3600 # seconds
         
         # traderState
         class TraderStateClass(FiniteStateClass):
@@ -60,9 +47,21 @@ class TickTrader(IBAccountManager):
         self.reqCurrentTime() # update stime
         self.reqPositions()
         self.context.portfolio.start_date=datetime.datetime.now()
-        
-        self.log.info(__name__ + ": " + "accountCode: " + str(self.accountCode))
     
+    def API_initialize(self):
+        # call Quantopian-like user API function
+        initialize(self.context)
+        # data is used to save the current security price info        
+        self.data = {}; 
+        if len(self.context.security) >= 2:
+            for ct in self.context.security:
+                self.data[ct] = DataClass()
+                # 0 = trade timestamp; 1 = price_last; 2 = size_last; 3 = record_timestamp
+                self.data[ct].RT_volume = np.zeros(shape = (0,4))
+        else:
+            self.data[self.context.security] = DataClass()
+            self.data[self.context.security].RT_volume = np.zeros(shape = (0,4))        
+        
     def tickString(self, tickerId, field, value):
         """
         IB C++ API call back function. The value variable contains the last 
@@ -228,6 +227,7 @@ if __name__ == "__main__":
     settings = pd.read_csv('settings.csv')
     
     trader = TickTrader()
+    trader.setup(PROGRAM_DEBUG = True, accountCode = settings['AccountCode'][0])
     ########## API
     order_with_SL_TP = trader.order_with_SL_TP
     log = trader.log
@@ -241,9 +241,9 @@ if __name__ == "__main__":
 #    print script
     exec(script)
     ######
-    
-    trader.setup(PROGRAM_DEBUG = True, accountCode = settings['AccountCode'][0])
         
+    trader.API_initialize()
+    
     c = MarketManager(PROGRAM_DEBUG = True, trader = trader)
     c.run_according_to_market(market_start_time = '9:29:55', 
                               market_close_time = '16:00:00')

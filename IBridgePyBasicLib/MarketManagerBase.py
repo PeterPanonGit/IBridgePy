@@ -111,25 +111,6 @@ class MarketManager(__USEasternMarketObject__):
         initialzation of the connection to IB
         updated account
         """
-        logger = logging.getLogger('TraderLog')
-        logger.setLevel(logging.NOTSET)
-        # create a file handler
-        self.todayDateStr = time.strftime("%Y-%m-%d")
-        if not os.path.exists('Log'):
-            os.makedirs('Log')
-        file_handler = logging.FileHandler('Log/TraderLog_' + self.todayDateStr + '.txt', mode = 'w')
-        file_handler.setLevel(logging.NOTSET)
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.NOTSET)
-        # create a logging format
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(formatter)
-        console_handler.setFormatter(formatter)
-        # add the handlers to the logger
-        logger.addHandler(file_handler)        
-        # trader log for everyday trading log
-        self.IBClient.log = logger
-        
         # connect to IB server, TWS is the default
         self.IBClient.connect("", self.IBClient.port, self.IBClient.clientId) # connect to server
         self.IBClient.log.info(__name__ + ": " + "Connected to IB, port = " + 
@@ -150,7 +131,8 @@ class MarketManager(__USEasternMarketObject__):
         disconnect from IB and close log file
         """
         self.IBClient.disconnect()
-        handlers = self.IBClient.log.handlers[:]
-        for handler in handlers:
-            handler.close()
-            self.IBClient.log.removeHandler(handler)
+        self.IBClient.log.close_log()
+#        handlers = self.IBClient.log.handlers[:]
+#        for handler in handlers:
+#            handler.close()
+#            self.IBClient.log.removeHandler(handler)

@@ -3,12 +3,14 @@
 import datetime, time
 import pandas as pd
 import logging
+import os
 
 from IBridgePy.IBridgePyBasicLib.quantopian import Security, ContextClass, PositionClass, \
 HistClass, create_contract, MarketOrder, create_order, OrderClass, same_security, \
 DataClass
 import IBCpp
 from BasicPyLib.FiniteState import FiniteStateClass
+from BasicPyLib.simpleLogger import SimpleLoggerClass
 
 class IBAccountManager(IBCpp.IBClient):
     """
@@ -69,8 +71,23 @@ class IBAccountManager(IBCpp.IBClient):
         self.TRADE_DEBUG = TRADE_DEBUG
         
         # trader log
-        logger = logging.getLogger('TraderLog')
-        self.log = logger
+#        logger = logging.getLogger('TraderLog')
+#        logger.setLevel(logging.NOTSET)
+#        # create a file handler
+        self.todayDateStr = time.strftime("%Y-%m-%d")
+#        file_handler = logging.FileHandler('Log/TraderLog_' + self.todayDateStr + '.txt', mode = 'w')
+#        file_handler.setLevel(logging.NOTSET)
+#        console_handler = logging.StreamHandler()
+#        console_handler.setLevel(logging.NOTSET)
+#        # create a logging format
+#        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+#        file_handler.setFormatter(formatter)
+#        console_handler.setFormatter(formatter)
+#        # add the handlers to the logger
+#        logger.addHandler(file_handler)
+#        logger.addHandler(console_handler)
+        self.log = SimpleLoggerClass('TraderLog_' + self.todayDateStr + '.txt')
+        self.log.info(__name__ + ": " + "accountCode: " + str(self.accountCode))
         
         # setup IB's log file and message level
         self.logFileName = "IB_system_log.txt"
@@ -79,7 +96,7 @@ class IBAccountManager(IBCpp.IBClient):
         self.addMessageLevel(IBCpp.MsgLevel.SYSERR)
         self.addMessageLevel(IBCpp.MsgLevel.IBINFO)
         self.log.info(__name__ + ": " + 
-        "IB message level: ", "{0:b}".format(self.getMessageLevel()))
+        "IB message level: " + "{0:b}".format(self.getMessageLevel()))
             
     def error(self, errorId, errorCode, errorString):
         """
@@ -88,7 +105,7 @@ class IBAccountManager(IBCpp.IBClient):
         """
         if errorCode < 2000:
             self.log.error(__name__ + ": " + 'errorId = ' + str(errorId) + 
-            'errorCode = ' + str(errorCode) + '\n' + 'error message: ' + errorString)
+            ', errorCode = ' + str(errorCode) + ', error message: ' + errorString)
             
     def currentTime(self, tm):
         """
