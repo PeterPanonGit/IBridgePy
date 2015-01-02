@@ -454,6 +454,8 @@ class IBAccountManager(IBCpp.IBClient):
         call back function of IB C++ API which update status or certain order
         indicated by orderId
         """
+        self.log.info(__name__ + ": " + str(orderId) + ", " + str(status) + ", "
+        + str(filled) + ", " + str(remaining) + ", " + str(avgFillPrice))
         if orderId in self.context.portfolio.openOrderBook:     
             self.context.portfolio.openOrderBook[orderId].filled=filled
             self.context.portfolio.openOrderBook[orderId].remaining=remaining

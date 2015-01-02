@@ -68,15 +68,17 @@ class TickTrader(IBAccountManager):
         trade price and volume information. User show define in this function
         how the last trade price and volume should be saved
         """
-        sec = self.context.security[tickerId]
+        # tickerId is indexed to data, so here we need to use data too
+        sec = self.data.keys()[tickerId]
         currentTime = datetime.datetime.now(tz = self.USeasternTimeZone)
         valueSplit = value.split(';')
         if len(valueSplit) > 1 and float(valueSplit[1]) > 0:
             timePy = float(valueSplit[2])/1000
             priceLast = float(valueSplit[0]); sizeLast = float(valueSplit[1])
             currentTimeStamp = time.mktime(datetime.datetime.now().timetuple())
-            self.log.debug(__name__ + ', ' + str(sec.symbol) + ', ' + str(priceLast)
-            + str(sizeLast) + ', ' + str(timePy) + ', ' + str(currentTime))
+            self.log.debug(__name__ + ', ' + str(tickerId) + ", " + str(sec.symbol)
+            + ', ' + str(priceLast)
+            + ", " + str(sizeLast) + ', ' + str(timePy) + ', ' + str(currentTime))
             # update price
             newRow = [float(valueSplit[2])/1000, priceLast, sizeLast, currentTimeStamp]
             priceSizeLastSymbol = self.data[sec].RT_volume
@@ -189,6 +191,7 @@ class TickTrader(IBAccountManager):
             self.nextOrderId += 1
         # print order placement time    
         self.log.info(__name__ + ": " + 'order placed at: ' + str(datetime.datetime.now(self.USeasternTimeZone)))
+        self.log.info(sec.symbol + ": " + orderAction + " " + str(amount))
     
         return self.nextOrderId
         
@@ -246,6 +249,6 @@ if __name__ == "__main__":
     
     c = MarketManager(PROGRAM_DEBUG = True, trader = trader)
     c.run_according_to_market(market_start_time = '9:29:55', 
-                              market_close_time = '16:00:00')
+                              market_close_time = '23:00:00')
     
     print("Finished!")
