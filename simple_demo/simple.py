@@ -27,7 +27,8 @@ class MyClient(IBCpp.IBClient) :  #  define a new client class. All client class
             contract.secType = "STK"
             contract.exchange = "SMART"
             contract.primaryExchange = "NASDAQ"
-            self.reqMktData(888, contract, '221', False)  # Once it called, market data will flow-in and corresponding events will be tricked automatically. 
+            for ii in range(100):
+                self.reqMktData(ii, contract, '221', False)  # Once it called, market data will flow-in and corresponding events will be tricked automatically. 
             self.state = "datareqed" # change the state so that you won't request the same data again. 
         
 

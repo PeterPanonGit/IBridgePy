@@ -5,7 +5,7 @@ Created on Wed Mar 26 18:44:04 2014
 @author: huapu
 """
 
-import IBpy  # You need to link/copy IBpy.so to the same directory 
+import IBCpp  # You need to link/copy IBCpp.so to the same directory 
 #import sys
 #import os
 import pandas as pd
@@ -16,112 +16,80 @@ from dateutil.tz import tzlocal
 #import numpy as np
 import matplotlib.pylab as plt
 
-class realTime_Multiple_Stocks(IBpy.IBClient) :  #  define a new client class. All client classes are recommended to derive from IBClient unless you have special need.  
+class GetHistData(IBCpp.IBClient):
     def setup(self):
-        self.state = "initial"
-        self.contract_list = pd.read_csv('test_contract_list.csv', index_col = 0)
-        self.nextValidId_number = 0
-        self.hist_open = pd.DataFrame()
-        self.hist_high = pd.DataFrame()
-        self.hist_low = pd.DataFrame()
-        self.hist_close = pd.DataFrame()
-        self.hist_volume = pd.DataFrame()        
-        # timezone info; only useful in getHistoricalData
-        if datetime.datetime.now(pytz.timezone('US/Eastern')).tzname() == 'EDT':
-            self.USeasternTimeZone = pytz.timezone('Etc/GMT+4')
-        else:
-            self.USeasternTimeZone = pytz.timezone('Etc/GMT+5')        
+        self.time_last_request_hist = None
+        self._empty_df = pd.DataFrame(columns = 
+            ['symbol', 'open','high','low','close', 
+             'volume', 'barCount', 'WAP'])
+        self.hist = self._empty_df 
+        self.req_hist_Id = 0
+        self.request_hist_data_status = None
+        self.currentHistSymbol = ""
         
     def error(self, errorId, errorCode, errorString):
-        if errorId > 0:
-            symbol = self.contract_list['symbol'][errorId]
-        else:
-            symbol = ''
-        print 'errorId = ' + str(errorId), 'symbol = ' + symbol, 'errorCode = ' + str(errorCode)
+        print 'errorId = ' + str(errorId), 'errorCode = ' + str(errorCode)
         print 'error message: ' + errorString
-                   
-    def historicalData(self, reqId, date, price_open, high, low, price_close, volume, barCount, WAP, hasGaps):
-        symbol = self.contract_list['symbol'][reqId]
-        if 'finished' in str(date):
-            return
+        
+    def request_hist_data(self, contract, endDateTime, durationStr, barSizeSetting):   
+        if (self.request_hist_data_status is not None and \
+        (datetime.datetime.now()-self.time_last_request_hist).total_seconds()<=16):
+            print "sleep for 16 seconds to avoid pace violation"
+            time.sleep(16)
+        self.hist = self._empty_df
+        self.req_hist_Id = self.req_hist_Id + 1
+        self.currentHistSymbol = contract.symbol
+        print "request historical data for %s" % (contract.symbol)
+        self.reqHistoricalData(self.req_hist_Id, contract, endDateTime , 
+                               durationStr, barSizeSetting, 'TRADES', 1, 1)
+        # Record the latest time when the hist data was requested
+        self.time_last_request_hist=datetime.datetime.now() 
+        self.request_hist_data_status='Submitted'
+        
+    def historicalData(self, reqId, date, price_open, price_high, price_low, 
+                       price_close, volume, barCount, WAP, hasGaps):
+        if reqId==self.req_hist_Id:           
+            if 'finished' in str(date):
+                self.request_hist_data_status='Done'
+            else: 
+                if '  ' in date: # Two datetime structues may come back
+                    date=datetime.datetime.strptime(date, '%Y%m%d  %H:%M:%S')                        
+                else:
+                    date=datetime.datetime.strptime(date, '%Y%m%d') 
+                if date in self.hist.index: # Write data to self.hist
+                    self.hist['symbol'][date] = self.currentHistSymbol
+                    self.hist['open'][date]=price_open
+                    self.hist['high'][date]=price_high
+                    self.hist['low'][date]=price_low
+                    self.hist['close'][date]=price_close
+                    self.hist['volume'][date] = volume
+                    self.hist['barCount'][date] = barCount
+                    self.hist['WAP'][date] = WAP
+                else:
+                    newRow = pd.DataFrame({'open':price_open,'high':price_high,
+                                           'low':price_low,'close':price_close, 
+                                           'volume': volume, 'barCount': barCount, 
+                                           'WAP': WAP,
+                                           'symbol': self.currentHistSymbol},
+                                          index = [date])
+                    self.hist=self.hist.append(newRow)
         else:
-            date = str(date)
-        ymd, hms = date.split('  ')
-        time_str = ymd[:4] + '-' + ymd[4:6] + '-' + ymd[6:8] + ' ' + hms
-        time_py = datetime.datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
-        time_py = time_py.replace(tzinfo = tzlocal())
-#        time_py = time_py.astimezone(pytz.timezone('Etc/GMT+5'))
-        time_py = time_py.astimezone(self.USeasternTimeZone)
-#        print time_str
-        if not (time_py in self.hist_close.index):
-            newRow = pd.DataFrame({k + ' open': pd.Series() for k in self.contract_list['symbol']}, index = [time_py])
-            newRow[symbol + ' open'] = price_open
-            self.hist_open = self.hist_open.append(newRow)
-            newRow = pd.DataFrame({k + ' high': pd.Series() for k in self.contract_list['symbol']}, index = [time_py])
-            newRow[symbol + ' high'] = high
-            self.hist_high = self.hist_high.append(newRow)
-            newRow = pd.DataFrame({k + ' low': pd.Series() for k in self.contract_list['symbol']}, index = [time_py])
-            newRow[symbol + ' low'] = low
-            self.hist_low = self.hist_low.append(newRow)
-            newRow = pd.DataFrame({k + ' close': pd.Series() for k in self.contract_list['symbol']}, index = [time_py])
-            newRow[symbol + ' close'] = price_close
-            self.hist_close = self.hist_close.append(newRow)    
-            newRow = pd.DataFrame({k + ' volume': pd.Series() for k in self.contract_list['symbol']}, index = [time_py])
-            newRow[symbol + ' volume'] = volume
-            self.hist_volume = self.hist_volume.append(newRow)
-        else:
-            self.hist_open[symbol + ' open'][time_py] = price_open
-            self.hist_high[symbol + ' high'][time_py] = high
-            self.hist_low[symbol + ' low'][time_py] = low
-            self.hist_close[symbol + ' close'][time_py] = price_close
-    
-    def plot_price_volume(self, symbol, startTime, endTime):
-        ax = plt.subplot(2, 1, 1)
-        self.hist_close[symbol + ' close'][startTime:endTime].plot(ax = ax)
-        self.hist_open[symbol + ' open'][startTime:endTime].plot(ax = ax)
-        self.hist_high[symbol + ' high'][startTime:endTime].plot(ax = ax)
-        self.hist_low[symbol + ' low'][startTime:endTime].plot(ax = ax)
-        ax.legend().set_visible(False)
-        ax.axes.get_xaxis().set_visible(False)
-        ax = plt.subplot(2, 1, 2)
-        self.hist_volume[symbol + ' volume'][startTime:endTime].plot(ax = ax)
-        plt.show()
-            
-    def runStrategy(self) :
-        '''
-        This should be your trading strategy's main entry. It will be called at the beginning of processMessages()
-        '''
-        pass
+            print 'reqId is not the same as req_hist_Id.' + \
+                'Please request historical data through request_hist_data() function'
 
 #            self.state = "datareqed" # change the state so that you won't request the same data again. 
             
 if __name__ == '__main__' :
-    port = 7496
-#    port = 4001
-    clientID = 1
-
-    c = realTime_Multiple_Stocks()  # create a client object
-    c.setup()      # additional setup. It's optional.
-    c.connect("", port, clientID) # you need to connect to the server before you do anything. 
-    dataDate = '2014-04-14'
-    startTime = datetime.datetime.strptime(dataDate + ' 9:30:00', '%Y-%m-%d %H:%M:%S')
-    startTime = startTime.replace(tzinfo = c.USeasternTimeZone)
-    endTime = datetime.datetime.strptime(dataDate + ' 15:59:30', '%Y-%m-%d %H:%M:%S')
-    endTime = endTime.replace(tzinfo = c.USeasternTimeZone)    
-    for ii, con in c.contract_list[:1].iterrows():
-        c.setup()
-        contract = IBpy.Contract()
-        symbol = con['symbol']
-        contract.symbol = con['symbol']
-        contract.secType = con['secType']
-        contract.exchange = con['exchange']
-        contract.primaryExchange = con['primaryExchange']
-        c.reqHistoricalData(ii, contract, ''.join(dataDate.split('-')) + ' 19:05:00 EST', 
-                               '1 D', '30 secs', 'TRADES', 1, 1)
-        time.sleep(1)        
-        while(1):
-            c.processMessages()       # put this function into infinit loop. A better way is to put it into a new thread.             
-            if len(c.hist_close) > 0 and (c.hist_close.index[-1] == endTime):
-                c.plot_price_volume(symbol, startTime, endTime)
-                c.cancelHistoricalData(ii)     
-                break            
+    # connect to IB
+    port = 7496; clientID = 1
+    c = GetHistData(); c.setup(); c.connect("", port, clientID)
+    # create contract and request historical data
+    contract = IBCpp.Contract()
+    contract.symbol = 'IBM'; contract.secType = 'STK'
+    contract.exchange = 'SMART'; contract.primaryExchange = 'NYSE'
+    c.request_hist_data(contract, '20141212  10:00:00 EST', '1 D', '30 secs')
+    while(c.request_hist_data_status != 'Done'):
+        c.processMessages()
+    # disconnect
+    c.disconnect()
+    print c.hist
