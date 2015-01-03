@@ -8,17 +8,23 @@ import logging
 import os
 
 from BasicPyLib.FiniteState import FiniteStateClass
-
-class __USEasternMarketObject__(object):
-    """
-    MarketObject is the abstract base class which manages algorithmic trading algorithms
-    When initializes it will determine the US Eastern time time zone
-    The basic method is run_according_to_market(), which sleeps when market closes
-    and runs when market is open from 9:30am to 4pm EST
-    inherited classes should overwrite init_obj(), run_client_algorithm() and destroy_obj()
-    """
-    def __init__(self, PROGRAM_DEBUG = False, MARKET_DEBUG = True):
-        """ determine US Eastern time zone depending on EST or EDT """
+                   
+class MarketManager(object):
+    """ 
+    Market Manager will run trading strategies according to the market hours.
+    It should contain a instance of IB's client, properly initialize the connection
+    to IB when market starts, and properly close the connection when market closes
+    inherited from __USEasternMarketObject__. 
+    USeasternTimeZone and run_according_to_market() are inherited
+    init_obj(), run_algorithm() and destroy_obj() should be overwritten
+    """    
+    def __init__(self, PROGRAM_DEBUG = False, MARKET_DEBUG = True, 
+                 port = 7496, clientID = 1, trader = None):
+        """
+        initializtion: create log file and IBClient
+        a trader instance must be passed in which has already run setup()
+        """
+        # determine US Eastern time zone depending on EST or EDT
         if datetime.datetime.now(pytz.timezone('US/Eastern')).tzname() == 'EDT':
             self.USeasternTimeZone = pytz.timezone('Etc/GMT+4')
         elif datetime.datetime.now(pytz.timezone('US/Eastern')).tzname() == 'EST':
@@ -36,63 +42,6 @@ class __USEasternMarketObject__(object):
         # DEBUG levels
         self.PROGRAM_DEBUG = PROGRAM_DEBUG
         self.MARKET_DEBUG = MARKET_DEBUG
-        
-    def init_obj(self):
-        pass
-    
-    def run_client_algorithm(self):
-        pass
-    
-    def destroy_obj(self):
-        pass
-    
-    def run_according_to_market(self, market_start_time = '9:30:00', 
-                                market_close_time = '16:00:00'):
-        """
-        run_according_to_market() will check if market is open every one second
-        if market opens, it will first initialize the object and then run the object
-        if market closes, it will turn the marketState back to "sleep"
-        """
-        while (self.marketState.is_state(self.marketState.SLEEP)):
-            time.sleep(1) # check if market is open every one second
-            currentTime = datetime.datetime.now(self.USeasternTimeZone)
-            dataDate = str(currentTime).split(' ')[0]
-            startTime = datetime.datetime.strptime(dataDate + ' ' + market_start_time , '%Y-%m-%d %H:%M:%S')
-            startTime = startTime.replace(tzinfo = self.USeasternTimeZone)
-            endTime = datetime.datetime.strptime(dataDate + ' ' + market_close_time, '%Y-%m-%d %H:%M:%S')
-            endTime = endTime.replace(tzinfo = self.USeasternTimeZone)           
-    #        print currentTime.hour, currentTime.minute, currentTime.second
-            if (self.marketState.is_state(self.marketState.SLEEP) \
-            and (currentTime > startTime) and (currentTime < endTime) \
-            and currentTime.isoweekday() in range(1, 6)):
-                self.marketState.set_state(self.marketState.RUN)
-                print 'start to run at: ', currentTime
-                self.init_obj()
-            while (self.marketState.is_state(self.marketState.RUN)):
-                self.run_client_algorithm()
-                currentTime = datetime.datetime.now(self.USeasternTimeZone)
-                if (currentTime >= endTime):
-                    print "Market is closed at: ", currentTime
-                    self.destroy_obj()
-                    self.marketState.set_state(self.marketState.SLEEP) 
-                    
-class MarketManager(__USEasternMarketObject__):
-    """ 
-    Market Manager will run trading strategies according to the market hours.
-    It should contain a instance of IB's client, properly initialize the connection
-    to IB when market starts, and properly close the connection when market closes
-    inherited from __USEasternMarketObject__. 
-    USeasternTimeZone and run_according_to_market() are inherited
-    init_obj(), run_algorithm() and destroy_obj() should be overwritten
-    """    
-    def __init__(self, PROGRAM_DEBUG = False, MARKET_DEBUG = True, 
-                 port = 7496, clientID = 1, trader = None):
-        """
-        initializtion: create log file and IBClient
-        a trader instance must be passed in which has already run setup()
-        """
-        super(MarketManager, self).__init__(PROGRAM_DEBUG = PROGRAM_DEBUG, 
-            MARKET_DEBUG = MARKET_DEBUG)
         
         # define the trade type
         if (trader is not None):
@@ -136,3 +85,40 @@ class MarketManager(__USEasternMarketObject__):
 #        for handler in handlers:
 #            handler.close()
 #            self.IBClient.log.removeHandler(handler)
+        
+    def run_according_to_market(self, market_start_time = '9:30:00', 
+                                market_close_time = '16:00:00'):
+        """
+        run_according_to_market() will check if market is open every one second
+        if market opens, it will first initialize the object and then run the object
+        if market closes, it will turn the marketState back to "sleep"
+        """
+        self.init_obj()
+        while (self.marketState.is_state(self.marketState.SLEEP)):
+            self.IBClient.processMessages()
+            time.sleep(1) # check if market is open every one second
+#            currentTime = datetime.datetime.now(tz = self.USeasternTimeZone)
+            currentTime = self.IBClient.stime
+            self.IBClient.reqCurrentTime()
+            if (currentTime is not None):
+                dataDate = str(currentTime).split(' ')[0]
+                startTime = datetime.datetime.strptime(dataDate + ' ' + market_start_time , '%Y-%m-%d %H:%M:%S')
+                startTime = startTime.replace(tzinfo = self.USeasternTimeZone)
+                endTime = datetime.datetime.strptime(dataDate + ' ' + market_close_time, '%Y-%m-%d %H:%M:%S')
+                endTime = endTime.replace(tzinfo = self.USeasternTimeZone)
+                print currentTime, startTime, endTime, (currentTime > startTime), (currentTime < endTime)
+    #        print currentTime.hour, currentTime.minute, currentTime.second
+            if (currentTime is not None and self.marketState.is_state(self.marketState.SLEEP) \
+            and (currentTime > startTime) and (currentTime < endTime)):
+#            and currentTime.isoweekday() in range(1, 6)):
+                self.marketState.set_state(self.marketState.RUN)
+                print 'start to run at: ', currentTime
+                if (not self.IBClient.isConnected()):
+                    self.init_obj()
+            while (self.marketState.is_state(self.marketState.RUN)):
+                self.run_client_algorithm()
+                currentTime = datetime.datetime.now(self.USeasternTimeZone)
+                if (currentTime >= endTime):
+                    print "Market is closed at: ", currentTime
+                    self.destroy_obj()
+                    self.marketState.set_state(self.marketState.SLEEP) 

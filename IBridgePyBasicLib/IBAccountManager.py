@@ -48,7 +48,7 @@ class IBAccountManager(IBCpp.IBClient):
         self.returned_hist= {}
         self.accountDownloadEndstatus='na'
         self.stime_previous = None
-        self.stime = datetime.datetime.now(tz = self.USeasternTimeZone)
+        self.stime = None
         self.context = ContextClass()
         self.context.USeasternTimeZone = self.USeasternTimeZone
         self.last_message='na'
@@ -574,3 +574,15 @@ class IBAccountManager(IBCpp.IBClient):
             return time_temp.astimezone(pytz.UTC)
         else:
             return time_temp.astimezone(timezone)
+
+if __name__ == "__main__":
+    port = 7496; clientID = 1
+    c = IBAccountManager()  # create a client object
+    c.setup();      # additional setup. It's optional.
+    c.connect("", port, clientID) # you need to connect to the server before you do anything.
+#    c.reqCurrentTime()
+#    while(1):
+#        if (c.stime is not None and c.stime_previous is None):
+#            c.stime_previous = c.stime
+#            print "current system time: ", c.stime, datetime.datetime.now(tz = c.USeasternTimeZone)
+#        c.processMessages()       # put this function into infinit loop. A better way is to put it into a new thread.     
