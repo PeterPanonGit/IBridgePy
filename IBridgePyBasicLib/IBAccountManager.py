@@ -217,12 +217,14 @@ class IBAccountManager(IBCpp.IBClient):
             self.returned_hist[security] = HistClass()
             req = datetime.datetime.strftime(endtime,"%Y%m%d %H:%M:%S") #datatime -> string
             self.reqHistoricalData(self.nextHistDataId, create_contract(security),
-                                   req, goback, barSize, 'BID', 1, 1)
+                                   req, goback, barSize, 'TRADES', 1, 1)
             time.sleep(0.1)
             self.returned_hist[security].status='submitted'# Record status
+            while (self.returned_hist[security].status != 'Done'):
+                self.processMessages()            
             self.returned_hist[security].req_id = self.nextHistDataId                     
             self.nextHistDataId += 1
-
+            
     ################ Real time tick data without volume info #########
     def tickPrice(self, TickerId, tickType, price, canAutoExecute):
         """

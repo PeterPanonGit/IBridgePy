@@ -120,5 +120,6 @@ class MarketManager(object):
                 currentTime = datetime.datetime.now(self.USeasternTimeZone)
                 if (currentTime >= endTime):
                     print "Market is closed at: ", currentTime
-                    self.destroy_obj()
                     self.marketState.set_state(self.marketState.SLEEP) 
+        
+        self.destroy_obj()

@@ -60,13 +60,15 @@ class TickTrader(IBAccountManager):
                 self.data[ct].RT_volume = np.zeros(shape = (0,4))
         else:
             self.data[self.context.security] = DataClass()
-            self.data[self.context.security].RT_volume = np.zeros(shape = (0,4))        
+            self.data[self.context.security].RT_volume = np.zeros(shape = (0,4))
         
     def tickString(self, tickerId, field, value):
         """
         IB C++ API call back function. The value variable contains the last 
         trade price and volume information. User show define in this function
         how the last trade price and volume should be saved
+        RT_volume: 0 = trade timestamp; 1 = price_last, 
+        2 = size_last; 3 = record_timestamp
         """
         # tickerId is indexed to data, so here we need to use data too
         sec = self.data.keys()[tickerId]
@@ -80,7 +82,7 @@ class TickTrader(IBAccountManager):
             + ', ' + str(priceLast)
             + ", " + str(sizeLast) + ', ' + str(timePy) + ', ' + str(currentTime))
             # update price
-            newRow = [float(valueSplit[2])/1000, priceLast, sizeLast, currentTimeStamp]
+            newRow = [timePy, priceLast, sizeLast, currentTimeStamp]
             priceSizeLastSymbol = self.data[sec].RT_volume
             priceSizeLastSymbol = np.vstack([priceSizeLastSymbol, newRow])
             # erase data points that go over the limit
@@ -203,7 +205,7 @@ class TickTrader(IBAccountManager):
         if self.traderState.is_state(self.traderState.INIT):
             if self.accountManagerState.is_state(self.accountManagerState.INIT):
                 self.req_hist_price(endtime=datetime.datetime.now(), 
-                                    goback='3 D', barSize='1 day')
+                                    goback='30 S', barSize='1 secs')
                 self.re_send = 0
                 self.req_real_time_price() # request market data
                 self.set_timer()
@@ -246,9 +248,11 @@ if __name__ == "__main__":
     ######
         
     trader.API_initialize()
+#    trader.connect("", 7496, 1)
+#    trader.disconnect()
     
     c = MarketManager(PROGRAM_DEBUG = True, trader = trader)
-    c.run_according_to_market(market_start_time = '9:29:55', 
+    c.run_according_to_market(market_start_time = '02:29:00',
                               market_close_time = '23:00:00')
     
     print("Finished!")

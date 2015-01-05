@@ -150,6 +150,7 @@ class DataClass(PrintableClass):
         self.high = high # Quatopian
         self.low = low # Quatopian
         self.volume = volume # Quatopian
+        self.daily_open_price = None
         self.daily_high_price = None
         self.daily_low_price = None
         self.bid_price = None

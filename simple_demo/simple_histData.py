@@ -32,10 +32,10 @@ class GetHistData(IBCpp.IBClient):
         print 'error message: ' + errorString
         
     def request_hist_data(self, contract, endDateTime, durationStr, barSizeSetting):   
-        if (self.request_hist_data_status is not None and \
-        (datetime.datetime.now()-self.time_last_request_hist).total_seconds()<=16):
-            print "sleep for 16 seconds to avoid pace violation"
-            time.sleep(16)
+#        if (self.request_hist_data_status is not None and \
+#        (datetime.datetime.now()-self.time_last_request_hist).total_seconds()<=16):
+#            print "sleep for 16 seconds to avoid pace violation"
+#            time.sleep(16)
         self.hist = self._empty_df
         self.req_hist_Id = self.req_hist_Id + 1
         self.currentHistSymbol = contract.symbol
@@ -45,6 +45,8 @@ class GetHistData(IBCpp.IBClient):
         # Record the latest time when the hist data was requested
         self.time_last_request_hist=datetime.datetime.now() 
         self.request_hist_data_status='Submitted'
+        while (self.request_hist_data_status != 'Done'):
+            self.processMessages()
         
     def historicalData(self, reqId, date, price_open, price_high, price_low, 
                        price_close, volume, barCount, WAP, hasGaps):
@@ -84,12 +86,17 @@ if __name__ == '__main__' :
     port = 7496; clientID = 1
     c = GetHistData(); c.setup(); c.connect("", port, clientID)
     # create contract and request historical data
-    contract = IBCpp.Contract()
-    contract.symbol = 'IBM'; contract.secType = 'STK'
-    contract.exchange = 'SMART'; contract.primaryExchange = 'NYSE'
-    c.request_hist_data(contract, '20141212  10:00:00 EST', '1 D', '30 secs')
-    while(c.request_hist_data_status != 'Done'):
-        c.processMessages()
+    symbs = ['COF', 'UA']
+    for s in symbs:
+        contract = IBCpp.Contract()
+        contract.symbol = s; contract.secType = 'STK'
+        contract.exchange = 'SMART'; contract.primaryExchange = 'NYSE'
+        c.request_hist_data(contract, '20150102  09:31:00 EST', '1 D', '30 secs')
+        print c.hist
+        print c.hist.iloc[0]['open']
+#    while(c.request_hist_data_status != 'Done'):
+#        print "request hist in main"
+#        c.processMessages()
     # disconnect
     c.disconnect()
-    print c.hist
+   
