@@ -2,6 +2,7 @@
 
 import datetime, time
 import pandas as pd
+import numpy as np
 import logging
 import os
 
@@ -10,23 +11,29 @@ HistClass, create_contract, MarketOrder, create_order, OrderClass, same_security
 DataClass
 import IBCpp
 from BasicPyLib.FiniteState import FiniteStateClass
-from BasicPyLib.simpleLogger import SimpleLoggerClass
+import BasicPyLib.simpleLogger as simpleLogger
+
+# https://www.interactivebrokers.com/en/software/api/apiguide/tables/tick_types.htm
+MSG_TABLE = {0: 'bid size', 1: 'bid price', 2: 'ask price', 3: 'ask size', 
+             4: 'last price', 5: 'last size', 6: 'daily high', 7: 'daily low', 
+             8: 'daily volume', 9: 'close', 14: 'open'}
 
 class IBAccountManager(IBCpp.IBClient):
     """
     IBAccountManager manages the account, order, and historical data information
     from IB. These information are needed by all kinds of traders.
     stime: system time obtained from IB
+    maxSaveTime: max timeframe to be saved in price_size_last_matrix for TickTrader
     """
     def setup(self, PROGRAM_DEBUG = False, TRADE_DEBUG = True,
-              USeasternTimeZone = None, accountCode = 'ALL', minTick = 0.01, 
-              port = 7496, clientId = 1):
+              accountCode = 'ALL', minTick = 0.01, 
+              maxSaveTime = 0, port = 7496, clientId = 1, logLevel = simpleLogger.INFO):
         """
         initialize the IBAccountManager. We don't do __init__ here because we don't
         want to overwrite parent class IBCpp.IBClient's __init__ function
         """
         # timezone info passed from MarketManager
-        self.USeasternTimeZone = USeasternTimeZone
+        self.USeasternTimeZone = None
         
         # traderState
         class AccountManagerStateClass(FiniteStateClass):
@@ -46,6 +53,7 @@ class IBAccountManager(IBCpp.IBClient):
         self.accountManagerState.set_state(self.accountManagerState.INIT)
         
         self.returned_hist= {}
+        self.data = {}
         self.accountDownloadEndstatus='na'
         self.stime_previous = None
         self.stime = None
@@ -53,6 +61,7 @@ class IBAccountManager(IBCpp.IBClient):
         self.context.USeasternTimeZone = self.USeasternTimeZone
         self.last_message='na'
         self.minTick = minTick
+        self.maxSaveTime = maxSaveTime # maxSaveTime is the duration for saving flow data. Unit: seconds
         
         # accountCode
         self.accountCode = accountCode
@@ -86,7 +95,8 @@ class IBAccountManager(IBCpp.IBClient):
 #        # add the handlers to the logger
 #        logger.addHandler(file_handler)
 #        logger.addHandler(console_handler)
-        self.log = SimpleLoggerClass('TraderLog_' + self.todayDateStr + '.txt')
+        self.log = simpleLogger.SimpleLoggerClass(filename = 
+        'TraderLog_' + self.todayDateStr + '.txt', logLevel = logLevel)
         self.log.info(__name__ + ": " + "accountCode: " + str(self.accountCode))
         
         # setup IB's log file and message level
@@ -97,6 +107,18 @@ class IBAccountManager(IBCpp.IBClient):
         self.addMessageLevel(IBCpp.MsgLevel.IBINFO)
         self.log.info(__name__ + ": " + 
         "IB message level: " + "{0:b}".format(self.getMessageLevel()))
+            
+    def setup_data(self):
+        """
+        setup self.data after the initialize() API is run
+        """
+        self.data={}; 
+        try:        
+            if len(self.context.security)>=2:
+                for ct in self.context.security:
+                    self.data[ct] = DataClass()
+        except:
+            self.data[self.context.security] = DataClass()
             
     def error(self, errorId, errorCode, errorString):
         """
@@ -137,7 +159,7 @@ class IBAccountManager(IBCpp.IBClient):
         self.timer_start = datetime.datetime.now(tz = self.USeasternTimeZone)
         self.log.debug(__name__ + ": " + "set timer" + str(self.timer_start))
         
-    def check_timer(self, step, limit = 10):
+    def check_timer(self, step, limit = 20):
         """
         check_timer will check if time limit exceeded for certain
         steps, including: updated positions, get nextValidId, etc
@@ -157,29 +179,29 @@ class IBAccountManager(IBCpp.IBClient):
                 '\n' + 'The content of self.hist_daily: ')
                 for security in self.data:
                     self.log.info(__name__ + ": " + str(self.data[security].hist_daily.head()))
-                if self.re_send < 3:    
-                    self.log.error(__name__ + ": " + 'Re-send req_daily_price_first')
-                    self.re_send += 1
-                    self.req_hist_price(endtime=datetime.datetime.now())
-                    self.set_timer()
-                else:
-                    self.log.error(__name__ + ": " + 'Re-send request three times, EXIT')
-                    exit()
+#                if self.re_send < 3:    
+#                    self.log.error(__name__ + ": " + 'Re-send req_daily_price_first')
+#                    self.re_send += 1
+#                    self.req_hist_price(endtime=datetime.datetime.now())
+#                    self.set_timer()
+#                else:
+#                    self.log.error(__name__ + ": " + 'Re-send request three times, EXIT')
+#                    exit()
             elif step == self.accountManagerState.WAIT_FOR_BAR_PRICE_CALLBACK:
                 self.log.error(__name__ + ": " + 'Time Limit Exceeded when \
                 requesting historical bar data' + \
                 str(step) + str(datetime.datetime.now()))
                 for security in self.data:
                     self.log.info(__name__ + ": " + str(self.data[security].hist_bar.head()))
-                if self.re_send < 3:    
-                    self.accountManagerState.set_state(
-                    self.accountManagerState.REQ_BAR_PRICE)
-                    self.log.error(__name__ + ": " + 'Re-send req_bar_price_first')
-                    self.re_send += 1
-                    self.set_timer()
-                else:
-                    self.log.error(__name__ + ": " + 'Re send request three times, EXIT')
-                    exit()
+#                if self.re_send < 3:    
+#                    self.accountManagerState.set_state(
+#                    self.accountManagerState.REQ_BAR_PRICE)
+#                    self.log.error(__name__ + ": " + 'Re-send req_bar_price_first')
+#                    self.re_send += 1
+#                    self.set_timer()
+#                else:
+#                    self.log.error(__name__ + ": " + 'Re send request three times, EXIT')
+#                    exit()
             elif step == self.accountManagerState.WAIT_FOR_UPDATE_PORTFOLIO_CALLBACK:
                 self.log.error(__name__ + ": " + 'update account failed')
         
@@ -220,32 +242,234 @@ class IBAccountManager(IBCpp.IBClient):
                                    req, goback, barSize, 'TRADES', 1, 1)
             time.sleep(0.1)
             self.returned_hist[security].status='submitted'# Record status
-            while (self.returned_hist[security].status != 'Done'):
-                self.processMessages()            
+            self.log.info(__name__ + ": " + "requesting hist data for " + security.symbol)
+#            while (self.returned_hist[security].status != 'Done'):
+#                self.processMessages() 
             self.returned_hist[security].req_id = self.nextHistDataId                     
             self.nextHistDataId += 1
             
-    ################ Real time tick data without volume info #########
+    ################ order functions
+    def order_with_SL_TP(self, sec, amount, orderId = None, 
+                         stopLossPrice = None, takeProfitPrice = None):
+        '''
+        This function make orders. When amount > 0 it is BUY and when amount < 0 it is SELL
+        '''
+        # fill order info
+        if amount > 0:
+            orderAction = 'BUY'
+            orderReverseAction = 'SELL'
+            amount = int(amount)
+        elif amount < 0:
+            orderAction = 'SELL'
+            orderReverseAction = 'BUY'
+            amount = int(np.abs(amount))
+        else:
+            self.log.warning("order amount is 0!")
+            return
+            
+        if (stopLossPrice is None):
+            self.log.warning("can not place an order without stop loss!")
+            return
+        # fill contract info
+        contract = create_contract(sec)
+        ### place order
+        # market order
+        marketOrder = IBCpp.Order()
+        marketOrder.action = orderAction
+        marketOrder.totalQuantity = amount
+        marketOrder.orderType = 'MKT'
+        marketOrder.transmit = False
+        marketOrder.account = self.accountCode
+        parentOrderId = self.nextOrderId
+        self.placeOrder(parentOrderId, contract, marketOrder)
+        if not (parentOrderId in self.context.portfolio.openOrderBook):
+            self.context.portfolio.openOrderBook[parentOrderId] = \
+                OrderClass(orderId = parentOrderId, parentOrderId = None,
+                    created=datetime.datetime.now(),
+                    stop = None,
+                    limit = None,
+                    amount = marketOrder.totalQuantity,
+                    sid = Security(contract.symbol+'.'+contract.currency),
+                    status = 'PreSubmitted',
+                    contract = contract,
+                    order = marketOrder,
+                    orderstate = None)
+        self.nextOrderId += 1
+        # stop sell order: stop loss
+        childOrder = IBCpp.Order()
+        childOrder.action = orderReverseAction
+        childOrder.totalQuantity = amount
+        childOrder.orderType = 'STP'
+        childOrder.auxPrice = self.roundToMinTick(stopLossPrice)
+        childOrder.parentId = parentOrderId
+        if (takeProfitPrice is None):
+            childOrder.transmit = True # if not limit order transmit STP order
+        else:
+            childOrder.transmit = False
+        childOrder.account = self.accountCode
+        childOrderId = self.nextOrderId
+        childOrder.ocaGroup = str(parentOrderId)
+        self.placeOrder(childOrderId, contract, childOrder)
+        if not (childOrderId in self.context.portfolio.openOrderBook):
+            self.context.portfolio.openOrderBook[childOrderId] = \
+                OrderClass(orderId = childOrderId, parentOrderId = parentOrderId,
+                    created=datetime.datetime.now(),
+                    stop = stopLossPrice,
+                    limit = None,
+                    amount = childOrder.totalQuantity,
+                    sid = Security(contract.symbol+'.'+contract.currency),
+                    status = 'PreSubmitted',
+                    contract = contract,
+                    order = childOrder,
+                    orderstate = None)
+        self.nextOrderId += 1
+        # limit sell order: take profit
+        # Limit order: an order to buy or sell at a specified price or better.
+        if (takeProfitPrice is not None):
+            childOrder = IBCpp.Order()
+            childOrder.action = orderReverseAction
+            childOrder.totalQuantity = amount
+            childOrder.orderType = 'LMT'
+            childOrder.lmtPrice = self.roundToMinTick(takeProfitPrice)
+            childOrder.parentId = parentOrderId
+            childOrder.transmit = True
+            childOrder.account = self.accountCode
+            childOrderId = self.nextOrderId
+            childOrder.ocaGroup = str(parentOrderId)
+            self.placeOrder(childOrderId, contract, childOrder)
+            if not (childOrderId in self.context.portfolio.openOrderBook):
+                self.context.portfolio.openOrderBook[childOrder] = \
+                    OrderClass(orderId = childOrderId, parentOrderId = parentOrderId,
+                        created=datetime.datetime.now(),
+                        stop = None,
+                        limit = takeProfitPrice,
+                        amount = childOrder.totalQuantity,
+                        sid = Security(contract.symbol+'.'+contract.currency),
+                        status = 'PreSubmitted',
+                        contract = contract,
+                        order = childOrder,
+                        orderstate = None)   
+            self.nextOrderId += 1
+        # print order placement time    
+        self.log.info(__name__ + ": " + 'order placed at: ' + str(datetime.datetime.now(self.USeasternTimeZone)))
+        self.log.info(sec.symbol + ": " + orderAction + " " + str(amount))
+    
+        return self.nextOrderId
+            
+    ############# Quantopian compatible order functions ###################
+    def order_quantopian(self, security, amount, style=MarketOrder()):       
+        print 'place_order'
+        if amount>0:  
+            action='BUY'
+            totalQuantity=amount
+        elif amount<0:
+            action='SELL'
+            totalQuantity=-amount
+        else:
+            return -1
+        security_order=create_order(action, totalQuantity, style)
+        if security_order != None:
+            cntrct=create_contract(security)
+            self.placeOrder(self.my_next_valid_id, cntrct, security_order)
+            print 'Request to',security_order.action,security_order.totalQuantity,'shares', cntrct.symbol+cntrct.currency,'id=',self.my_next_valid_id       
+            self.context.portfolio.openOrderBook[self.my_next_valid_id] = \
+                OrderClass(orderId=self.my_next_valid_id,
+                    created=datetime.datetime.now(),
+                    stop=style[1],
+                    limit=style[2],
+                    amount=security_order.totalQuantity,
+                    sid=Security(cntrct.symbol+'.'+cntrct.currency),
+                    status='PreSubmitted',
+                    contract=cntrct,
+                    order=security_order,
+                    orderstate=None)
+            self.my_next_valid_id=self.my_next_valid_id+1
+            return self.my_next_valid_id-1
+        else:
+            print 'order_quantopian wrong serurity instance',security
+            return -1
+
+    def order_value_quantopian(self, security, value, style=MarketOrder()):
+        print 'order_value_quantopian'
+        import math        
+        for ct in self.data:
+            if same_security(security, ct):
+                return self.order_quantopian(security, int(math.floor(value/self.data[ct].price)), style=style)
+#        self.throwError('order_value_quantopian', 'could not find security')
+        
+    def order_percent_quantopian(self, security, percent, style=MarketOrder()):
+        print 'order_percent_quantopian'
+        import math        
+        for ct in self.data:
+            if same_security(security, ct):        
+                return self.order_quantopian(security, int(math.floor(self.context.portfolio.portfolio_value/self.data[ct].price)) , style=style)
+#        self.throwError('order_percent_quantopian', 'could not find security')
+
+
+    def order_target_quantopian(self, security, amount, style=MarketOrder()):
+        print 'place_order_target' 
+        hold=self.how_many_I_am_holding(security) 
+        #print amount,hold
+        if amount!=hold:
+            return self.order_quantopian(security, amount=amount-hold, style=style)
+        else:
+            return -1
+    def order_target_value_quantopian(self, security, value, style=MarketOrder()):
+        print 'place_order_target_value'
+        import math             
+        hold=self.how_many_I_am_holding(security, style='value')
+        for ct in self.data:
+            if same_security(security, ct):        
+                return self.order_quantopian(security, int(math.floor((value-hold)/self.data[ct].price)) , style=style)
+#        self.throwError('order_target_value_quantopian', 'could not find security')
+
+    def order_target_percent_quantopian(self, security, percent, style=MarketOrder()):
+        print 'place_order_percent_value'
+        import math             
+        hold=self.how_many_I_am_holding(security, style='portfolio_percentage')
+        for ct in self.data:
+            if same_security(security, ct):        
+                return self.order_quantopian(security, int(math.floor((percent-hold)*self.context.portfolio.portfolio_value/self.data[ct].price)) , style=style)
+#        self.throwError('order_target_percent_quantopian', 'could not find security')
+                
+    ################ Real time tick price data #########
+    def update_DataClass(self, security, name, value):
+        if (self.maxSaveTime > 0 and value > 0):
+            currentTimeStamp = time.mktime(datetime.datetime.now().timetuple())
+            newRow = [currentTimeStamp, value]
+            tmp = getattr(self.data[security], name)
+            tmp = np.vstack([tmp, newRow])
+            # erase data points that go over the limit
+            if (currentTimeStamp - tmp[0, 0]) > self.maxSaveTime:
+                tmp = tmp[1:,:]
+            setattr(self.data[security], name, tmp)
+        
     def tickPrice(self, TickerId, tickType, price, canAutoExecute):
         """
-        call back function of IB C++ API. This function will get tick prices and 
-        it is up to the specific Trader class to decide how to save the data
+        call back function of IB C++ API. This function will get tick prices
         """
         for security in self.data: 
             if security.req_real_time_price_id==TickerId:
                 self.data[security].datetime=self.stime
+                self.log.debug(__name__ + ', ' + str(TickerId) + ", " + MSG_TABLE[tickType]
+                + ", " + str(security.symbol) + ", price = " + str(price))
                 if tickType==1: #Bid price
-                    self.data[security].bid_price=price
+                    self.data[security].bid_price = price
+                    self.update_DataClass(security, 'bid_price_flow', price)
                 elif tickType==2: #Ask price
-                    self.data[security].ask_price=price
+                    self.data[security].ask_price = price
+                    self.update_DataClass(security, 'ask_price_flow', price)                 
                 elif tickType==4: #Last price
                     self.data[security].price = price
+                    self.update_DataClass(security, 'last_price_flow', price)                
                 elif tickType==6: #High daily price
                     self.data[security].daily_high_price=price
                 elif tickType==7: #Low daily price
                     self.data[security].daily_low_price=price
                 elif tickType==9: #last close price
-                    pass
+                    self.data[security].close_price = price
+                elif tickType == IBCpp.TickType.OPEN:
+                    self.data[security].open_price = price
 
                 if (self.stime_previous is None or self.stime - 
                 self.stime_previous > self.barSize):
@@ -259,6 +483,57 @@ class IBAccountManager(IBCpp.IBClient):
                     if tickType==4 and price<self.data[security].low: #Bid price
                         self.data[security].low=price
                         
+    def tickSize(self, TickerId, tickType, size):
+        """
+        call back function of IB C++ API. This function will get tick size
+        """
+        for security in self.data: 
+            if security.req_real_time_price_id==TickerId:
+                self.log.debug(__name__ + ', ' + str(TickerId) + ", " + MSG_TABLE[tickType]
+                + ", " + str(security.symbol) + ", size = " + str(size))
+                self.data[security].datetime=self.stime
+                if tickType == 0: # Bid Size
+                    self.data[security].bid_size = size
+                    self.update_DataClass(security, 'bid_size_flow', size)
+                if tickType == 3: # Ask Size
+                    self.data[security].ask_size = size
+                    self.update_DataClass(security, 'ask_size_flow', size)  
+                if tickType == 3: # Last Size
+                    self.data[security].size = size
+                    self.update_DataClass(security, 'last_size_flow', size)
+                if tickType == 8: # Volume
+                    self.data[security].volume = size
+                    
+    def tickString(self, tickerId, field, value):
+        """
+        IB C++ API call back function. The value variable contains the last 
+        trade price and volume information. User show define in this function
+        how the last trade price and volume should be saved
+        RT_volume: 0 = trade timestamp; 1 = price_last, 
+        2 = size_last; 3 = record_timestamp
+        """
+        # tickerId is indexed to data, so here we need to use data too
+#        sec = self.data.keys()[tickerId]
+        for security in self.data: 
+            if security.req_real_time_price_id==tickerId:        
+                currentTime = datetime.datetime.now(tz = self.USeasternTimeZone)
+                valueSplit = value.split(';')
+                if len(valueSplit) > 1 and float(valueSplit[1]) > 0:
+                    timePy = float(valueSplit[2])/1000
+                    priceLast = float(valueSplit[0]); sizeLast = float(valueSplit[1])
+                    currentTimeStamp = time.mktime(datetime.datetime.now().timetuple())
+                    self.log.debug(__name__ + ', ' + str(tickerId) + ", " 
+                    + str(security.symbol) + ', ' + str(priceLast)
+                    + ", " + str(sizeLast) + ', ' + str(timePy) + ', ' + str(currentTime))
+                    # update price
+                    newRow = [timePy, priceLast, sizeLast, currentTimeStamp]
+                    priceSizeLastSymbol = self.data[security].RT_volume
+                    priceSizeLastSymbol = np.vstack([priceSizeLastSymbol, newRow])
+                    # erase data points that go over the limit
+                    if (timePy - priceSizeLastSymbol[0, 0]) > self.maxSaveTime:
+                        priceSizeLastSymbol = priceSizeLastSymbol[1:,:]
+                    self.data[security].RT_volume = priceSizeLastSymbol
+            
     ################ Historical data ################################
     def historicalData(self, reqId, date, price_open, price_high, price_low, price_close, volume, barCount, WAP, hasGaps):
         """
@@ -270,6 +545,7 @@ class IBAccountManager(IBCpp.IBClient):
             if self.returned_hist[security].req_id==reqId:              
                 if 'finished' in str(date):
                     self.returned_hist[security].status='Done'
+                    self.log.info(__name__ + ": " + "finished req hist data for " + security.symbol)
                 else:
                     if '  ' in date:                       
                         date=datetime.datetime.strptime(date, '%Y%m%d  %H:%M:%S') # change string to datetime                        
@@ -286,7 +562,7 @@ class IBAccountManager(IBCpp.IBClient):
                                                'low':price_low,'close':price_close,
                                                'volume':volume}, index = [date])
                         self.returned_hist[security].hist=self.returned_hist[security].hist.append(newRow)
-
+            
     def req_real_time_price_check_end(self):
         """
         check if all securities have obtained price info

@@ -1,6 +1,7 @@
 
 import datetime
 import pandas as pd
+import numpy as np
 import os
 from BasicPyLib.Printable import PrintableClass
 
@@ -145,6 +146,7 @@ class DataClass(PrintableClass):
                  volume = 0):        
         self.datetime=datetime # Quatopian
         self.price=price # Quatopian
+        self.size = None
         self.open_price=open_price # Quatopian
         self.close_price=close_price # Quatopian
         self.high = high # Quatopian
@@ -155,10 +157,19 @@ class DataClass(PrintableClass):
         self.daily_low_price = None
         self.bid_price = None
         self.ask_price = None
+        self.bid_size = None
+        self.ask_size = None
         self.hist_daily = pd.DataFrame()
         self.hist_bar = pd.DataFrame()
+        # 0 = record_timestamp
+        self.bid_price_flow = np.zeros(shape = (0,2))
+        self.ask_price_flow = np.zeros(shape = (0,2))
+        self.last_price_flow = np.zeros(shape = (0,2))
+        self.bid_size_flow = np.zeros(shape = (0,2))
+        self.ask_size_flow = np.zeros(shape = (0,2))
+        self.last_size_flow = np.zeros(shape = (0,2))        
         # 0 = trade timestamp; 1 = price_last; 2 = size_last; 3 = record_timestamp
-        self.RT_volume = {}
+        self.RT_volume = np.zeros(shape = (0,4))
         
     def update(self,time_input):
         self.datetime=time_input

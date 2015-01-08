@@ -86,12 +86,12 @@ if __name__ == '__main__' :
     port = 7496; clientID = 1
     c = GetHistData(); c.setup(); c.connect("", port, clientID)
     # create contract and request historical data
-    symbs = ['COF', 'UA']
+    symbs = ['IBM', 'BMA']
     for s in symbs:
         contract = IBCpp.Contract()
         contract.symbol = s; contract.secType = 'STK'
         contract.exchange = 'SMART'; contract.primaryExchange = 'NYSE'
-        c.request_hist_data(contract, '20150102  09:31:00 EST', '1 D', '30 secs')
+        c.request_hist_data(contract, '20150105  09:31:00 EST', '60 S', '30 secs')
         print c.hist
         print c.hist.iloc[0]['open']
 #    while(c.request_hist_data_status != 'Done'):

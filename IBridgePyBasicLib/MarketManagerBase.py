@@ -73,6 +73,7 @@ class MarketManager(object):
 #        if (self.IBClient.PROGRAM_DEBUG):
 #            print self.IBClient.traderState, self.IBClient.accountManagerState
         self.IBClient.runAlgorithm()
+        self.IBClient.reqCurrentTime()
         self.IBClient.processMessages()
     
     def destroy_obj(self):
@@ -106,7 +107,7 @@ class MarketManager(object):
                 startTime = startTime.replace(tzinfo = self.USeasternTimeZone)
                 endTime = datetime.datetime.strptime(dataDate + ' ' + market_close_time, '%Y-%m-%d %H:%M:%S')
                 endTime = endTime.replace(tzinfo = self.USeasternTimeZone)
-                print currentTime, startTime, endTime, (currentTime > startTime), (currentTime < endTime)
+#                print currentTime, startTime, endTime, (currentTime > startTime), (currentTime < endTime)
     #        print currentTime.hour, currentTime.minute, currentTime.second
             if (currentTime is not None and self.marketState.is_state(self.marketState.SLEEP) \
             and (currentTime > startTime) and (currentTime < endTime)):
