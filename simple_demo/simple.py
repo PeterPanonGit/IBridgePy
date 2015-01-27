@@ -54,7 +54,7 @@ class MyClient(IBCpp.IBClient) :  #  define a new client class. All client class
         '''
         self.log.debug(__name__ + ', ' + str(TickerId) + ", " + MSG_TABLE[tickType]
                 + ", price = " + str(price))
-        if (tickType in [1, 2, 4, 9]):
+        if (tickType in [1, 2, 4, 9, 14]):
             print "TicketId='%d'" % TickerId
             print "TicketType='%d'" % tickType
             print "price='%f'" % price

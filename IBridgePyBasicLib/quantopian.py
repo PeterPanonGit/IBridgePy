@@ -155,6 +155,7 @@ class DataClass(PrintableClass):
         self.daily_open_price = None
         self.daily_high_price = None
         self.daily_low_price = None
+        self.daily_prev_close_price = None
         self.bid_price = None
         self.ask_price = None
         self.bid_size = None

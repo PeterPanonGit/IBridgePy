@@ -467,9 +467,9 @@ class IBAccountManager(IBCpp.IBClient):
                 elif tickType==7: #Low daily price
                     self.data[security].daily_low_price=price
                 elif tickType==9: #last close price
-                    self.data[security].close_price = price
+                    self.data[security].daily_prev_close_price = price
                 elif tickType == IBCpp.TickType.OPEN:
-                    self.data[security].open_price = price
+                    self.data[security].daily_open_price = price
 
                 if (self.stime_previous is None or self.stime - 
                 self.stime_previous > self.barSize):
