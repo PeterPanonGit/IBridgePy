@@ -20,8 +20,11 @@ def create_contract(security):
     contract.symbol = security.symbol
     contract.secType = security.secType
     contract.exchange = security.exchange
-    contract.primaryExchange = security.primaryExchange
     contract.currency = security.currency       
+    contract.primaryExchange = security.primaryExchange
+    if security.secType=='FUT':
+        contract.expiry = security.expiry       
+
     return contract 
 
 def create_order(action,amount,style): 
@@ -84,13 +87,21 @@ class Security(PrintableClass):
         self.security_start_date = None
         self.security_end_date=datetime.datetime.now()
         self.nextReqMktDataId = 0
-
+        #print symbol.split('.')
         if symbol.split('.')[0] in ['EUR','GBP','USD','JPY','AUD','CAD','CHF'] and symbol.split('.')[-1] in ['EUR','GBP','USD','JPY','AUD','CAD','CHF']:
             self.symbol=symbol[0:3]            
             self.secType = 'CASH'
             self.exchange = 'IDEALPRO'
             self.primaryExchange = 'IDEALPRO'
             self.currency = symbol.split('.')[-1]  
+        elif symbol.split('.')[0] == 'FUT':
+            self.symbol=symbol.split('.')[1]           
+            self.secType = symbol.split('.')[0] 
+            self.exchange = 'GLOBEX'
+            self.primaryExchange='GLOBEX'
+            self.currency = symbol.split('.')[2]
+            self.expiry=symbol.split('.')[3]
+
         else:
             self.symbol=symbol
             self.secType='STK'
@@ -104,8 +115,6 @@ class Security(PrintableClass):
             else:
                 self.primaryExchange = 'NYSE'
                 self.currency = 'USD' 
-
-        
 class ContextClass(PrintableClass):
     def __init__(self):
         self.portfolio = PortofolioClass()
@@ -143,7 +152,8 @@ class DataClass(PrintableClass):
                  close_price = None,
                  high = None,
                  low =None,
-                 volume = 0):        
+                 volume = 0,
+                 hist_frame=['1 day']):        
         self.datetime=datetime # Quatopian
         self.price=price # Quatopian
         self.size = None
@@ -160,8 +170,9 @@ class DataClass(PrintableClass):
         self.ask_price = None
         self.bid_size = None
         self.ask_size = None
-        self.hist_daily = pd.DataFrame()
-        self.hist_bar = pd.DataFrame()
+        self.hist={}
+        for frame in hist_frame:
+            self.hist[frame]=pd.DataFrame()
         # 0 = record_timestamp
         self.bid_price_flow = np.zeros(shape = (0,2))
         self.ask_price_flow = np.zeros(shape = (0,2))
@@ -199,10 +210,12 @@ class DataClass(PrintableClass):
         return pd.rolling_sum(self.hist_daily['volume']*self.hist_daily['close'],n)/pd.rolling_sum(self.hist_daily['volume'],n)
 
 class HistClass(object):
-    def __init__(self):
-        self.req_id=0
+    def __init__(self, security=None, period='1 day'):
+        self.status=None
+        self.security=security
+        self.period=period
         self.hist=pd.DataFrame(columns=['open','high','low','close','volume'])
-        self.status='na'
+
 
 class OrderClass(object):
     def __init__(self,orderId, created, parentOrderId = None, stop = None, 

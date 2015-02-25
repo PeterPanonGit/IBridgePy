@@ -73,10 +73,11 @@ if __name__ == '__main__' :
     c.connect("", port, clientID) # you need to connect to the server before you do anything.
     c.reqCurrentTime()
     contract = IBCpp.Contract()
-    contract.symbol = "IBM"
-    contract.secType = "STK"
-    contract.exchange = "SMART"
-    contract.primaryExchange = "NYSE"
+    contract.symbol = 'EUR'
+    contract.currency='USD'
+    contract.secType = 'CASH'
+    contract.exchange = "IDEALPRO"
+    contract.primaryExchange = "IDEALPRO"
     c.reqMktData(1, contract, '233', False)  # Once it called, market data will flow-in and corresponding events will be tricked automatically.     
     while(1):
         if (c.stime is not None and c.stime_previous is None):

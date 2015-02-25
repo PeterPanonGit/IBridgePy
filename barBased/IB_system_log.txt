@@ -1,4 +1,4 @@
-[Mon Dec 22 14:22:21 2014] IBINFO: Connecting to 127.0.0.1:7496with client ID 1
+[Tue Feb 24 22:50:37 2015] IBINFO: Connecting to 127.0.0.1:7496with client ID 1
 
-[Mon Dec 22 14:22:21 2014] IBINFO: Connected to 127.0.0.1:7496 with client ID 1
+[Tue Feb 24 22:50:37 2015] IBINFO: Connected to 127.0.0.1:7496 with client ID 1
 

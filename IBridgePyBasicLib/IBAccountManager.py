@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import logging
 import os
+import pytz
 
 from IBridgePy.IBridgePyBasicLib.quantopian import Security, ContextClass, PositionClass, \
 HistClass, create_contract, MarketOrder, create_order, OrderClass, same_security, \
@@ -118,7 +119,7 @@ class IBAccountManager(IBCpp.IBClient):
                 for ct in self.context.security:
                     self.data[ct] = DataClass()
         except:
-            self.data[self.context.security] = DataClass()
+            self.data[self.context.security] = DataClass(hist_frame=self.context.hist_frame)
             
     def error(self, errorId, errorCode, errorString):
         """
@@ -159,7 +160,7 @@ class IBAccountManager(IBCpp.IBClient):
         self.timer_start = datetime.datetime.now(tz = self.USeasternTimeZone)
         self.log.debug(__name__ + ": " + "set timer" + str(self.timer_start))
         
-    def check_timer(self, step, limit = 20):
+    def check_timer(self, step, limit = 1):
         """
         check_timer will check if time limit exceeded for certain
         steps, including: updated positions, get nextValidId, etc
@@ -172,7 +173,29 @@ class IBAccountManager(IBCpp.IBClient):
                     self.log.error(__name__ + ": " + 'Time Limit Exceeded when \
                     requesting nextValidId' + str(step,datetime.datetime.now()) + \
                     '\n' + 'self.nextValidId_status = ' + str(self.nextValidId_status))
-                    self.set_timer()
+                    exit()
+                elif self.req_real_time_price_check_end() != 'Done':
+                    self.log.error(__name__ + ": " + 'ERROR in receiving real time quotes')                    
+                    for security in self.data:
+                        security.print_obj()
+                        #for ct in [self.data[security].bid_price,self.data[security].ask_price]:                              
+                        #    if ct < 0.0001:
+                        #        self.log.error(__name__ + ": " + security.print_obj())
+                    exit()            
+                elif self.accountDownloadEndstatus !='Done':
+                    self.log.error(__name__ + ": " + 'ERROR in accountDonwload')                    
+                else:   
+                    self.log.error(__name__ + ": ERROR in retrieve hist data")
+                    for reqid in self.returned_hist:
+                        print self.returned_hist[reqid].status, reqid
+                        if self.returned_hist[reqid].status!='Done':
+                                self.log.error(__name__ + ": " + self.returned_hist[reqid].security.print_obj()\
+                                                        +'.'+self.returned_hist[reqid].period)
+
+                            #print self.returned_hist[reqid].security.symbol+'.' \
+                            #     +self.returned_hist[reqid].security.currency+'.' \
+                            #     +self.returned_hist[reqid].security.secType+'.'\
+                            #     +self.returned_hist[reqid].period
             elif step == self.accountManagerState.WAIT_FOR_DAILY_PRICE_CALLBACK:
                 self.log.error(__name__ + ": " + 'Time Limit Exceeded when \
                 requesting historical daily data' + step, datetime.datetime.now() + \
@@ -230,23 +253,50 @@ class IBAccountManager(IBCpp.IBClient):
             self.nextReqMktDataId += 1  # Prepare for next request
 
     ################# Request historical data ##########################################
-    def req_hist_price(self, endtime, goback='1 Y', barSize='1 day'): 
+    def req_hist_price(self, security, endtime, goback=None, barSize=None): 
         """
         Send request to IB server for real time market data
         """           
-        for security in self.data:
-            #print 'req_hist_price', endtime,self.stime, security.symbol
-            self.returned_hist[security] = HistClass()
+        #print 'req_hist_price', security.symbol+security.currency
+        if goback==None:
+            if barSize=='1 day':
+                goback='1 Y'
+            elif barSize=='1 min':
+                goback='20000 S'
+            elif barSize=='10 mins':
+                goback='1 D'
+            elif barSize=='1 hour':
+                goback='30 D'
+            elif barSize=='4 hours':
+                goback='20 D'
+
+            else:
+                print 'req_hist_price cannot handle',barSize
+                exit()
+        # Submit request to IB
+        if endtime.tzname()==None:
             req = datetime.datetime.strftime(endtime,"%Y%m%d %H:%M:%S") #datatime -> string
+        else:
+            endtime=endtime.astimezone(tz=pytz.utc)
+            req = datetime.datetime.strftime(endtime,"%Y%m%d %H:%M:%S %Z") #datatime -> string
+        #print req
+        if security.secType=='STK' or security.secType=='FUT':
             self.reqHistoricalData(self.nextHistDataId, create_contract(security),
                                    req, goback, barSize, 'TRADES', 1, 1)
-            time.sleep(0.1)
-            self.returned_hist[security].status='submitted'# Record status
-            self.log.info(__name__ + ": " + "requesting hist data for " + security.symbol)
-#            while (self.returned_hist[security].status != 'Done'):
-#                self.processMessages() 
-            self.returned_hist[security].req_id = self.nextHistDataId                     
-            self.nextHistDataId += 1
+        elif security.secType=='CASH':
+            self.reqHistoricalData(self.nextHistDataId, create_contract(security),
+                                   req, goback, barSize, 'BID', 1, 1)
+        # Record requst info
+        self.returned_hist[self.nextHistDataId] = HistClass(security, barSize)
+        self.returned_hist[self.nextHistDataId].status='submitted'# Record status
+
+        # Others
+        time.sleep(0.1)
+        self.log.info(__name__ + ": " + "requesting hist data for " + security.symbol+'.' \
+                                  + security.currency+'.'\
+                                  + security.secType+'.'\
+                                  + barSize)                    
+        self.nextHistDataId += 1
             
     ################ order functions
     def order_with_SL_TP(self, sec, amount, orderId = None, 
@@ -471,17 +521,17 @@ class IBAccountManager(IBCpp.IBClient):
                 elif tickType == IBCpp.TickType.OPEN:
                     self.data[security].daily_open_price = price
 
-                if (self.stime_previous is None or self.stime - 
-                self.stime_previous > self.barSize):
-                    # the begining of the bar
-                    self.data[security].open_price=self.data[security].bid_price
-                    self.data[security].high=self.data[security].bid_price
-                    self.data[security].low=self.data[security].bid_price
-                else:
-                    if tickType==4 and price>self.data[security].high: #Bid price
-                        self.data[security].high=price
-                    if tickType==4 and price<self.data[security].low: #Bid price
-                        self.data[security].low=price
+                #if (self.stime_previous is None or self.stime - 
+                #self.stime_previous > self.barSize):
+                #    # the begining of the bar
+                #    self.data[security].open_price=self.data[security].bid_price
+                #    self.data[security].high=self.data[security].bid_price
+                #    self.data[security].low=self.data[security].bid_price
+                #else:
+                #    if tickType==4 and price>self.data[security].high: #Bid price
+                #        self.data[security].high=price
+                #    if tickType==4 and price<self.data[security].low: #Bid price
+                #        self.data[security].low=price
                         
     def tickSize(self, TickerId, tickType, size):
         """
@@ -540,28 +590,31 @@ class IBAccountManager(IBCpp.IBClient):
         call back function from IB C++ API
         return the historical data for requested security
         """
-        #print reqId, date, price_open, price_high, price_low, price_close, volume, barCount, WAP, hasGaps
-        for security in self.returned_hist:            
-            if self.returned_hist[security].req_id==reqId:              
-                if 'finished' in str(date):
-                    self.returned_hist[security].status='Done'
-                    self.log.info(__name__ + ": " + "finished req hist data for " + security.symbol)
-                else:
-                    if '  ' in date:                       
-                        date=datetime.datetime.strptime(date, '%Y%m%d  %H:%M:%S') # change string to datetime                        
-                    else:
-                        date=datetime.datetime.strptime(date, '%Y%m%d') # change string to datetime
-                    if date in self.returned_hist[security].hist.index:
-                        self.returned_hist[security].hist['open'][date]=price_open
-                        self.returned_hist[security].hist['high'][date]=price_high
-                        self.returned_hist[security].hist['low'][date]=price_low
-                        self.returned_hist[security].hist['close'][date]=price_close
-                        self.returned_hist[security].hist['volume'][date]=volume
-                    else:
-                        newRow = pd.DataFrame({'open':price_open,'high':price_high,
-                                               'low':price_low,'close':price_close,
-                                               'volume':volume}, index = [date])
-                        self.returned_hist[security].hist=self.returned_hist[security].hist.append(newRow)
+        #print reqId, date, price_open, price_high, price_low, price_close, volume, barCount, WAP, hasGaps              
+        if 'finished' in str(date):
+            self.returned_hist[reqId].status='Done'
+            self.log.info(__name__ + ": " + "finished req hist data for "\
+                                   + self.returned_hist[reqId].security.symbol+'.'\
+                                  + self.returned_hist[reqId].security.currency+'.'\
+                                  + self.returned_hist[reqId].security.secType+'.'\
+                                  + self.returned_hist[reqId].period+' '\
+                                  +str(len(self.returned_hist[reqId].hist))+' lines')
+        else:
+            if '  ' in date:                       
+                date=datetime.datetime.strptime(date, '%Y%m%d  %H:%M:%S') # change string to datetime                        
+            else:
+                date=datetime.datetime.strptime(date, '%Y%m%d') # change string to datetime
+            if date in self.returned_hist[reqId].hist.index:
+                self.returned_hist[reqId].hist['open'][date]=price_open
+                self.returned_hist[reqId].hist['high'][date]=price_high
+                self.returned_hist[reqId].hist['low'][date]=price_low
+                self.returned_hist[reqId].hist['close'][date]=price_close
+                self.returned_hist[reqId].hist['volume'][date]=volume
+            else:
+                newRow = pd.DataFrame({'open':price_open,'high':price_high,
+                                       'low':price_low,'close':price_close,
+                                       'volume':volume}, index = [date])
+                self.returned_hist[reqId].hist=self.returned_hist[reqId].hist.append(newRow)
             
     def req_real_time_price_check_end(self):
         """
@@ -578,8 +631,8 @@ class IBAccountManager(IBCpp.IBClient):
         """
         check if all securities has obtained the requested historical data
         """
-        for security in self.returned_hist:
-            if self.returned_hist[security].status!='Done':
+        for req_id in self.returned_hist:
+            if self.returned_hist[req_id].status!='Done':
                 return False
         return True                  
         
@@ -610,14 +663,14 @@ class IBAccountManager(IBCpp.IBClient):
             if i==0:
                 if frequency=='1d':
                     #print self.data[security].hist_daily[inpt][-bar_count:]
-                    result=pd.DataFrame({security:self.data[security].hist_daily[inpt][-bar_count:]},index=self.data[security].hist_daily.index[-bar_count:])
+                    result=pd.DataFrame({security:self.data[security].hist['1 day'][inpt][-bar_count:]},index=self.data[security].hist['1 day'].index[-bar_count:])
                 if frequency=='1m':
-                    result=pd.DataFrame({security:self.data[security].hist_bar[inpt][-bar_count:]},index=self.data[security].hist_bar.index[-bar_count:])
+                    result=pd.DataFrame({security:self.data[security].hist['1 min'][inpt][-bar_count:]},index=self.data[security].hist['1 min'].index[-bar_count:])
             else:
                 if frequency=='1d':
-                    newColumn=pd.DataFrame({security:self.data[security].hist_daily[inpt][-bar_count:]},index=self.data[security].hist_daily.index[-bar_count:])
+                    newColumn=pd.DataFrame({security:self.data[security].hist['1 day'][inpt][-bar_count:]},index=self.data[security].hist['1 day'].index[-bar_count:])
                 if frequency=='1m':
-                    newColumn=pd.DataFrame({security:self.data[security].hist_bar[inpt][-bar_count:]},index=self.data[security].hist_bar.index[-bar_count:])
+                    newColumn=pd.DataFrame({security:self.data[security].hist['1 min'][inpt][-bar_count:]},index=self.data[security].hist['1 min'].index[-bar_count:])
                 result=result.join(newColumn,how='outer')
         if ffill==True:
             result=result.fillna(method='ffill')

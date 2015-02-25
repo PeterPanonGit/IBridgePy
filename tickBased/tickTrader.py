@@ -55,30 +55,32 @@ class TickTrader(IBAccountManager):
         
     ############# this function is running in an infinite loop
     def runAlgorithm(self):
+        print 'runAlgorithm'
         time.sleep(0.1) # sleep to avoid exceeding IB's max data rate
         self.reqCurrentTime()
         # initialize
         if self.traderState.is_state(self.traderState.INIT):
             if self.accountManagerState.is_state(self.accountManagerState.INIT):
                 self.log.info(__name__ + ": " + "entering INIT stage")
-#                self.req_hist_price(endtime=datetime.datetime.now(), 
-#                                    goback='3 D', barSize='1 day')
+                self.req_hist_price(endtime=datetime.datetime.now(), 
+                                    goback='60 D', barSize='1 day')
                 self.re_send = 0
                 self.req_real_time_price() # request market data
-#                self.set_timer()
-#                self.accountManagerState.set_state(
-#                    self.accountManagerState.WAIT_FOR_INIT_CALLBACK)
-#            if self.accountManagerState.is_state(
-#                    self.accountManagerState.WAIT_FOR_INIT_CALLBACK): 
-#                self.check_timer(self.accountManagerState.WAIT_FOR_INIT_CALLBACK)
-#                if self.req_hist_price_check_end() and self.nextOrderId_Status =='Done': 
+                self.set_timer()
+                self.accountManagerState.set_state(
+                    self.accountManagerState.WAIT_FOR_INIT_CALLBACK)
+                
+            if self.accountManagerState.is_state(
+                    self.accountManagerState.WAIT_FOR_INIT_CALLBACK): 
+                self.check_timer(self.accountManagerState.WAIT_FOR_INIT_CALLBACK)
+                if self.req_hist_price_check_end() and self.nextOrderId_Status =='Done': 
                     # update historical data for each security
-#                    for security in self.returned_hist:
-#                        self.data[security].hist_daily = \
-#                            self.returned_hist[security].hist
-                self.traderState.set_state(self.traderState.TRADE)
-                self.accountManagerState.set_state(self.accountManagerState.SLEEP)
-                self.log.info(__name__ + ": " + "completing init stage")
+                    for security in self.returned_hist:
+                        self.data[security].hist_daily = \
+                            self.returned_hist[security].hist
+                    self.traderState.set_state(self.traderState.TRADE)
+                    self.accountManagerState.set_state(self.accountManagerState.SLEEP)
+                    self.log.info(__name__ + ": " + "completing init stage")
 
         # every tick
         if self.traderState.is_state(self.traderState.TRADE):
@@ -95,6 +97,7 @@ if __name__ == "__main__":
     ########## API
     order_with_SL_TP = trader.order_with_SL_TP
     log = trader.log
+    history=trader.history_quantopian
     ##########
     
     ###### read in the algorithm script
@@ -102,7 +105,7 @@ if __name__ == "__main__":
     print "Now running algorithm: ", settings['Algorithm'][0]
     with open('algos/' + settings['Algorithm'][0] + '.py') as f:
         script = f.read()
-#    print script
+    #print script
     exec(script)
     ######
         
@@ -111,7 +114,7 @@ if __name__ == "__main__":
 #    trader.disconnect()
     
     c = MarketManager(PROGRAM_DEBUG = True, trader = trader)
-    c.run_according_to_market(market_start_time = '09:31:00',
-                              market_close_time = '16:00:00')
+    c.run_according_to_market(market_start_time = '00:00:01',
+                              market_close_time = '23:59:59')
     
     print("Finished!")
