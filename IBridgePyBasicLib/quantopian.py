@@ -87,23 +87,19 @@ class Security(PrintableClass):
         self.security_start_date = None
         self.security_end_date=datetime.datetime.now()
         self.nextReqMktDataId = 0
-        #print symbol.split('.')
-        if symbol.split('.')[0] in ['EUR','GBP','USD','JPY','AUD','CAD','CHF'] and symbol.split('.')[-1] in ['EUR','GBP','USD','JPY','AUD','CAD','CHF']:
-            self.symbol=symbol[0:3]            
-            self.secType = 'CASH'
+
+        self.secType = symbol.split('.')[0]
+        self.symbol=symbol.split('.')[1]            
+        self.currency = symbol.split('.')[2]
+
+        if self.secType=='CASH': # 'CASH.EUR.USD'
             self.exchange = 'IDEALPRO'
             self.primaryExchange = 'IDEALPRO'
-            self.currency = symbol.split('.')[-1]  
-        elif symbol.split('.')[0] == 'FUT':
-            self.symbol=symbol.split('.')[1]           
-            self.secType = symbol.split('.')[0] 
+        elif self.secType == 'FUT': # 'FUT.ES.USD.201503'
             self.exchange = 'GLOBEX'
             self.primaryExchange='GLOBEX'
-            self.currency = symbol.split('.')[2]
             self.expiry=symbol.split('.')[3]
-
-        else:
-            self.symbol=symbol
+        elif self.secType == 'STK':
             self.secType='STK'
             self.exchange = 'SMART'
             tmp_df = stockList[stockList['Symbol'] == symbol]
@@ -115,6 +111,7 @@ class Security(PrintableClass):
             else:
                 self.primaryExchange = 'NYSE'
                 self.currency = 'USD' 
+                
 class ContextClass(PrintableClass):
     def __init__(self):
         self.portfolio = PortofolioClass()
